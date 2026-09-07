@@ -6,8 +6,8 @@
 ## M0 环境就绪(前置:P7-P24)- 进行中
 
 - [x] conda 虚拟环境 `campus-copilot`,Python 版本锁定(项目内 .venv,Python 3.13.15,conda-forge)
-- [ ] `.env` 配置 DEEPSEEK_API_KEY,.gitignore 生效
-- [ ] 脚本一:调 DeepSeek 完成对话(invoke)+ 流式(stream)
+- [x] `.env` 配置 DEEPSEEK_API_KEY,.gitignore 生效(已验证 check-ignore)
+- [x] 脚本一:调 DeepSeek 完成对话(invoke)+ 流式(stream)——src/hello_stream.py 验证通过
 - [ ] LangSmith 接入,trace 可见
 - [x] git 初始化,首个 commit(fa6aefc,身份:Kiyotaka)
 
@@ -82,3 +82,4 @@
 | 2026-09-02 | study-buddy 立项(后被替换) |
 | 2026-09-03 | 用户判断 study-buddy 偏 toy,重新立项 campus-copilot;骨架搭建完成 |
 | 2026-09-07 | 基建第 1 项:项目落位 E:\Campus Copilot,conda 环境(Python 3.13.15)+ git 身份配置 + 首个 commit。坑:Git Bash 传 POSIX 路径给 conda 需转 Windows 风格;defaults 频道缺 py3.13,改用 conda-forge |
+| 2026-09-07 | 基建第 2、3 项:DeepSeek key 配置并验证;依赖锁定安装(langchain 1.2.12 全家桶);src/hello_stream.py 跑通 invoke + stream。坑:.env 预置 LANGSMITH_TRACING=true 但无 key 导致 401 报错刷屏,已改 false 待接入后再开 |
