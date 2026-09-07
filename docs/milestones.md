@@ -3,13 +3,13 @@
 > 顺序 = 课程章节顺序,学到哪做到哪。每个里程碑有验收标准(DoD),全勾完才算完成。
 > 状态:未开始 / 进行中 / 完成
 
-## M0 环境就绪(前置:P7-P24)- 未开始
+## M0 环境就绪(前置:P7-P24)- 进行中
 
-- [ ] conda 虚拟环境 `campus-copilot`,Python 版本锁定
+- [x] conda 虚拟环境 `campus-copilot`,Python 版本锁定(项目内 .venv,Python 3.13.15,conda-forge)
 - [ ] `.env` 配置 DEEPSEEK_API_KEY,.gitignore 生效
 - [ ] 脚本一:调 DeepSeek 完成对话(invoke)+ 流式(stream)
 - [ ] LangSmith 接入,trace 可见
-- [ ] git 初始化,首个 commit
+- [x] git 初始化,首个 commit(fa6aefc,身份:Kiyotaka)
 
 **DoD**:终端与模型流式对话 3 轮,LangSmith 有完整 trace。
 
@@ -81,3 +81,4 @@
 |---|---|
 | 2026-09-02 | study-buddy 立项(后被替换) |
 | 2026-09-03 | 用户判断 study-buddy 偏 toy,重新立项 campus-copilot;骨架搭建完成 |
+| 2026-09-07 | 基建第 1 项:项目落位 E:\Campus Copilot,conda 环境(Python 3.13.15)+ git 身份配置 + 首个 commit。坑:Git Bash 传 POSIX 路径给 conda 需转 Windows 风格;defaults 频道缺 py3.13,改用 conda-forge |
