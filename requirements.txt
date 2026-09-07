@@ -1,0 +1,8 @@
+# 依赖清单 - 跟着课程逐步添加,不提前安装
+# M0 (P7-P24):  python-dotenv, langchain, langchain-openai, langsmith
+# M1 (P25-P32): (无新增)
+# M2 (P33-P63): pydantic, sqlite3(标准库)
+# M3 (P64-P85): (langchain 中间件随主包)
+# M4 (P86-P101): psycopg[binary] 或课程指定 PG 相关包
+# M5 (P102-P116): pymilvus, pypdf, langchain-milvus 及课程指定 loader
+# M6: fastapi, uvicorn
