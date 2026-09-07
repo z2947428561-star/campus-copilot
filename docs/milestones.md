@@ -3,12 +3,12 @@
 > 顺序 = 课程章节顺序,学到哪做到哪。每个里程碑有验收标准(DoD),全勾完才算完成。
 > 状态:未开始 / 进行中 / 完成
 
-## M0 环境就绪(前置:P7-P24)- 进行中
+## M0 环境就绪(前置:P7-P24)- 完成(2026-09-07)
 
 - [x] conda 虚拟环境 `campus-copilot`,Python 版本锁定(项目内 .venv,Python 3.13.15,conda-forge)
 - [x] `.env` 配置 DEEPSEEK_API_KEY,.gitignore 生效(已验证 check-ignore)
 - [x] 脚本一:调 DeepSeek 完成对话(invoke)+ 流式(stream)——src/hello_stream.py 验证通过
-- [ ] LangSmith 接入,trace 可见
+- [x] LangSmith 接入,trace 可见(tracing 开启,项目名 campus-copilot,上报无报错)
 - [x] git 初始化,首个 commit(fa6aefc,身份:Kiyotaka)
 
 **DoD**:终端与模型流式对话 3 轮,LangSmith 有完整 trace。
