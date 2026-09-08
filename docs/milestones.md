@@ -13,13 +13,13 @@
 
 **DoD**:终端与模型流式对话 3 轮,LangSmith 有完整 trace。
 
-## M1 多轮对话 CLI(前置:P25-P32)- 未开始
+## M1 多轮对话 CLI(前置:P25-P32)- 完成(2026-09-08)
 
-- [ ] ChatPromptTemplate 系统提示词(校园助手人设)
-- [ ] MessagesPlaceholder 注入对话历史,内存版多轮
-- [ ] CLI 循环交互
+- [x] ChatPromptTemplate 系统提示词(校园助手人设)——src/prompt.py
+- [x] MessagesPlaceholder 注入对话历史,内存版多轮——src/chat_cli.py
+- [x] CLI 循环交互(input 循环 + 退出指令 + Ctrl+C 处理)
 
-**DoD**:连续对话记得上文;改提示词只动模板。
+**DoD**:连续对话记得上文;改提示词只动模板。——三轮管道测试通过(第 2 轮准确回答用户姓名与专业);人设集中在 prompt.py。
 
 ## M2 Agent + 结构化数据工具(前置:P33-P63)- 未开始
 
@@ -83,3 +83,5 @@
 | 2026-09-03 | 用户判断 study-buddy 偏 toy,重新立项 campus-copilot;骨架搭建完成 |
 | 2026-09-07 | 基建第 1 项:项目落位 E:\Campus Copilot,conda 环境(Python 3.13.15)+ git 身份配置 + 首个 commit。坑:Git Bash 传 POSIX 路径给 conda 需转 Windows 风格;defaults 频道缺 py3.13,改用 conda-forge |
 | 2026-09-07 | 基建第 2、3 项:DeepSeek key 配置并验证;依赖锁定安装(langchain 1.2.12 全家桶);src/hello_stream.py 跑通 invoke + stream。坑:.env 预置 LANGSMITH_TRACING=true 但无 key 导致 401 报错刷屏,已改 false 待接入后再开 |
+| 2026-09-07 | M0 收尾:LangSmith key 接入,tracing 开启(LANGSMITH_PROJECT=campus-copilot),上报验证通过,M0 闭环 |
+| 2026-09-08 | M1 完成:model.py(模型工厂)+ prompt.py(ChatPromptTemplate + MessagesPlaceholder)+ chat_cli.py(消息列表内存历史 + CLI 循环)。三轮管道测试:记忆(答出姓名专业)、人设(承认能力边界)、退出全部通过。参考实现由向导编写,用户自写一遍吸收中 |
