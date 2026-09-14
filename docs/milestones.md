@@ -21,9 +21,9 @@
 
 **DoD**:连续对话记得上文;改提示词只动模板。——三轮管道测试通过(第 2 轮准确回答用户姓名与专业);人设集中在 prompt.py。
 
-## M2 Agent + 结构化数据工具(前置:P33-P63)- 未开始
+## M2 Agent + 结构化数据工具(前置:P33-P63)- 进行中
 
-- [ ] 造种子数据 + 建库脚本:`data/structured/seed_*.json` → SQLite
+- [x] 造种子数据 + 建库脚本:`data/structured/seed_*.json` → SQLite(5 张表已造:校历 14 周真实数据 + 课程 20 门 + 教室 24 间 + 课表 33 条 + 成绩 5 门;建库脚本待写)
 - [ ] 工具 1 `query_timetable`:查课表/空教室
 - [ ] 工具 2 `get_academic_week`:今天第几教学周/距假期周数
 - [ ] 工具 3 `calculate_gpa`:成绩计算,Pydantic 返回结构化分析报告
@@ -85,3 +85,4 @@
 | 2026-09-07 | 基建第 2、3 项:DeepSeek key 配置并验证;依赖锁定安装(langchain 1.2.12 全家桶);src/hello_stream.py 跑通 invoke + stream。坑:.env 预置 LANGSMITH_TRACING=true 但无 key 导致 401 报错刷屏,已改 false 待接入后再开 |
 | 2026-09-07 | M0 收尾:LangSmith key 接入,tracing 开启(LANGSMITH_PROJECT=campus-copilot),上报验证通过,M0 闭环 |
 | 2026-09-08 | M1 完成:model.py(模型工厂)+ prompt.py(ChatPromptTemplate + MessagesPlaceholder)+ chat_cli.py(消息列表内存历史 + CLI 循环)。三轮管道测试:记忆(答出姓名专业)、人设(承认能力边界)、退出全部通过。参考实现由向导编写,用户自写一遍吸收中 |
+| 2026-09-14 | 学校确认:厦门大学马来西亚分校(XMUM)。种子数据完成:校历用官网真实数据(九月学期 2026,14 教学周),课程/教室/课表/成绩为参考真实结构的模拟数据;JSON 合法性与先修链完整性已验证 |

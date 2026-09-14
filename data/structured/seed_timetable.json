@@ -1,0 +1,43 @@
+{
+  "_meta": {
+    "description": "课表占用:Block A 的模拟排课记录,weekday 1-5=周一至周五,时段为马来西亚高校典型两小时制",
+    "note": "只登记已占用,未出现的(教室,天,时段)组合即为空教室 —— 空教室查询=全量组合减去本表;weeks 表示教学周范围",
+    "fictional": true
+  },
+  "periods": ["08:30-10:00", "10:15-11:45", "12:00-13:30", "14:00-15:30", "15:45-17:15"],
+  "entries": [
+    {"room": "A101", "weekday": 1, "period": "08:30-10:00", "course_id": "CS101", "weeks": "1-14"},
+    {"room": "A101", "weekday": 3, "period": "10:15-11:45", "course_id": "CS101", "weeks": "1-14"},
+    {"room": "A102", "weekday": 1, "period": "10:15-11:45", "course_id": "MA101", "weeks": "1-14"},
+    {"room": "A102", "weekday": 2, "period": "08:30-10:00", "course_id": "MA101", "weeks": "1-14"},
+    {"room": "A103", "weekday": 2, "period": "14:00-15:30", "course_id": "MA102", "weeks": "1-14"},
+    {"room": "A103", "weekday": 4, "period": "08:30-10:00", "course_id": "MA102", "weeks": "1-14"},
+    {"room": "A104", "weekday": 1, "period": "12:00-13:30", "course_id": "DS201", "weeks": "1-14"},
+    {"room": "A104", "weekday": 3, "period": "14:00-15:30", "course_id": "CS301", "weeks": "1-14"},
+    {"room": "A105", "weekday": 1, "period": "10:15-11:45", "course_id": "AI301", "weeks": "1-14"},
+    {"room": "A105", "weekday": 4, "period": "10:15-11:45", "course_id": "AI302", "weeks": "1-14"},
+    {"room": "A106", "weekday": 2, "period": "10:15-11:45", "course_id": "EN101", "weeks": "1-14"},
+    {"room": "A106", "weekday": 5, "period": "08:30-10:00", "course_id": "EN101", "weeks": "1-14"},
+    {"room": "A107", "weekday": 3, "period": "08:30-10:00", "course_id": "LC101", "weeks": "1-14"},
+    {"room": "A107", "weekday": 5, "period": "10:15-11:45", "course_id": "LC101", "weeks": "1-14"},
+    {"room": "A108", "weekday": 2, "period": "12:00-13:30", "course_id": "GE102", "weeks": "1-14"},
+    {"room": "A108", "weekday": 4, "period": "14:00-15:30", "course_id": "CS302", "weeks": "1-14"},
+    {"room": "A109", "weekday": 3, "period": "12:00-13:30", "course_id": "IT202", "weeks": "1-14"},
+    {"room": "A109", "weekday": 5, "period": "14:00-15:30", "course_id": "IT202", "weeks": "1-14"},
+    {"room": "A110", "weekday": 1, "period": "15:45-17:15", "course_id": "CS303", "weeks": "1-14"},
+    {"room": "A110", "weekday": 4, "period": "15:45-17:15", "course_id": "CS303", "weeks": "1-14"},
+    {"room": "A111", "weekday": 2, "period": "15:45-17:15", "course_id": "AI303", "weeks": "6-14"},
+    {"room": "A111", "weekday": 5, "period": "12:00-13:30", "course_id": "SC301", "weeks": "1-14"},
+    {"room": "A201", "weekday": 1, "period": "14:00-15:30", "course_id": "CS101", "weeks": "1-14"},
+    {"room": "A201", "weekday": 3, "period": "15:45-17:15", "course_id": "CS101", "weeks": "1-14"},
+    {"room": "A202", "weekday": 2, "period": "14:00-15:30", "course_id": "MA101", "weeks": "1-14"},
+    {"room": "A203", "weekday": 4, "period": "12:00-13:30", "course_id": "MA102", "weeks": "1-14"},
+    {"room": "A204", "weekday": 3, "period": "10:15-11:45", "course_id": "DS201", "weeks": "1-14"},
+    {"room": "A205", "weekday": 5, "period": "15:45-17:15", "course_id": "LC101", "weeks": "1-14"},
+    {"room": "A206", "weekday": 1, "period": "12:00-13:30", "course_id": "AI301", "weeks": "1-14"},
+    {"room": "A207", "weekday": 4, "period": "08:30-10:00", "course_id": "CS201", "weeks": "1-14"},
+    {"room": "A208", "weekday": 5, "period": "14:00-15:30", "course_id": "CS302", "weeks": "1-14"},
+    {"room": "A209", "weekday": 2, "period": "08:30-10:00", "course_id": "GE102", "weeks": "1-14"},
+    {"room": "A210", "weekday": 3, "period": "08:30-10:00", "course_id": "EN101", "weeks": "1-14"}
+  ]
+}

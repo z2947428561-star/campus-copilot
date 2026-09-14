@@ -52,6 +52,43 @@
         模型:DeepSeek(主)+ Ollama(备) · 全链路 LangSmith 追踪
 ```
 
+## 本地运行(在 cmd 里跑不起来看这里)
+
+项目环境是一个 **conda 环境**(`conda create -p .venv` 创建)。新开的 cmd 里默认的 `python` 是 **conda base**(`E:\developTools`),那里 **没装 langchain**,所以直接 `python src\chat_cli.py` 会报:
+
+```
+ModuleNotFoundError: No module named 'langchain_core'
+```
+
+两种正确启动方式:
+
+**方式一:一键启动(推荐)**
+
+```
+run_chat.cmd
+```
+
+双击 `run_chat.cmd` 也行。它内部固定使用项目自己的解释器,不受当前 PATH 和是否 `conda activate` 影响,并且会把 cmd 码页切成 UTF-8(否则中文输入输出会乱码)。
+
+**方式二:手动激活环境**
+
+```
+conda activate "E:\Campus Copilot\.venv"
+python src\chat_cli.py
+```
+
+**坑位备忘**
+
+| 现象 | 原因 |
+|---|---|
+| `ModuleNotFoundError: No module named 'langchain_core'` | 用的是 conda base 或系统 Python,不是项目环境 |
+| `.venv\Scripts\python` 报「不是内部或外部命令」 | conda 环境的解释器在 **`.venv\python.exe`**,没有 `Scripts\python.exe` |
+| 中文乱码 | cmd 默认码页是 GBK,先用 `chcp 65001`,或直接用 `run_chat.cmd` |
+| PyCharm 里运行报同样的模块错误 | 项目 SDK 目前是 `Python 3.11`(没装依赖),要改成 `E:\Campus Copilot\.venv\python.exe` |
+| `KeyError: 'DEEPSEEK_API_KEY'` | 当前目录下找不到 `.env`,请在项目根目录运行 |
+
+对话中退出:输入「退出」或 `quit`。
+
 ## 数据策略(本项目的真正难点,先看 docs/data-plan.md)
 
 - 非结构化:**只采集学校官网公开信息**(学籍管理规定、培养方案、奖学金办法等),爬取即合规

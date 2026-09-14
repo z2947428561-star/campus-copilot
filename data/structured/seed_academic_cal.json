@@ -1,0 +1,35 @@
+{
+  "_meta": {
+    "description": "XMUM 九月学期校历(2026),日期来自学校官方公开校历",
+    "source": "https://www.xmu.edu.my (Undergraduate Academic Calendar)",
+    "note": "公共假期若落在周日,马来西亚惯例周一补假"
+  },
+  "semester": "September Semester 2026",
+  "academic_year": "2026/2027",
+  "registration_days": ["2026-09-25", "2026-09-26"],
+  "orientation_day": "2026-09-27",
+  "weeks": [
+    {"week_no": 1,  "start": "2026-09-28", "end": "2026-10-04", "type": "teaching"},
+    {"week_no": 2,  "start": "2026-10-05", "end": "2026-10-11", "type": "teaching"},
+    {"week_no": 3,  "start": "2026-10-12", "end": "2026-10-18", "type": "teaching"},
+    {"week_no": 4,  "start": "2026-10-19", "end": "2026-10-25", "type": "teaching"},
+    {"week_no": 5,  "start": "2026-10-26", "end": "2026-11-01", "type": "teaching"},
+    {"week_no": 6,  "start": "2026-11-02", "end": "2026-11-08", "type": "teaching"},
+    {"week_no": 7,  "start": "2026-11-09", "end": "2026-11-15", "type": "teaching"},
+    {"week_no": 8,  "start": "2026-11-16", "end": "2026-11-22", "type": "teaching"},
+    {"week_no": 9,  "start": "2026-11-23", "end": "2026-11-29", "type": "teaching"},
+    {"week_no": 10, "start": "2026-11-30", "end": "2026-12-06", "type": "teaching"},
+    {"week_no": 11, "start": "2026-12-07", "end": "2026-12-13", "type": "teaching"},
+    {"week_no": 12, "start": "2026-12-14", "end": "2026-12-20", "type": "teaching"},
+    {"week_no": 13, "start": "2026-12-21", "end": "2026-12-27", "type": "teaching"},
+    {"week_no": 14, "start": "2026-12-28", "end": "2027-01-03", "type": "teaching"}
+  ],
+  "revision_week": {"start": "2027-01-04", "end": "2027-01-10"},
+  "exam_week": {"start": "2027-01-11", "end": "2027-01-21"},
+  "semester_break": {"start": "2027-01-23", "end": "2027-02-11"},
+  "holidays_in_semester": [
+    {"date": "2026-11-09", "name": "Deepavali(屠妖节,补假)"},
+    {"date": "2026-12-11", "name": "Sultan of Selangor's Birthday(雪兰莪州苏丹诞辰)"},
+    {"date": "2026-12-25", "name": "Christmas Day(圣诞节)"}
+  ]
+}

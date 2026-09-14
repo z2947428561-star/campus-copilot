@@ -1,0 +1,29 @@
+{
+  "_meta": {
+    "description": "课程库:参考 XMUM 计算机类专业的真实课程体系构造(课程名为英文,与学校英文授课一致)",
+    "note": "MPU 为马来西亚高教部规定必修课;prerequisites 为课程先修链;year 为建议修读学年,sem 为开设学期(Sep=九月学期, Apr=四月学期)",
+    "fictional": true
+  },
+  "courses": [
+    {"course_id": "CS101", "name": "Programming Fundamentals", "credits": 4, "dept": "School of AI and Robotics", "prerequisites": [], "sem": "Sep", "year": 1},
+    {"course_id": "CS102", "name": "Object-Oriented Programming", "credits": 4, "dept": "School of AI and Robotics", "prerequisites": ["CS101"], "sem": "Apr", "year": 1},
+    {"course_id": "MA101", "name": "Calculus I", "credits": 3, "dept": "Department of Mathematics", "prerequisites": [], "sem": "Sep", "year": 1},
+    {"course_id": "MA102", "name": "Linear Algebra", "credits": 3, "dept": "Department of Mathematics", "prerequisites": [], "sem": "Sep", "year": 1},
+    {"course_id": "MA201", "name": "Probability and Statistics", "credits": 3, "dept": "Department of Mathematics", "prerequisites": ["MA101"], "sem": "Sep", "year": 2},
+    {"course_id": "EN101", "name": "Academic English", "credits": 2, "dept": "Language Centre", "prerequisites": [], "sem": "Sep", "year": 1},
+    {"course_id": "LC101", "name": "Bahasa Melayu Level 1 (MPU)", "credits": 2, "dept": "Language Centre", "prerequisites": [], "sem": "Sep", "year": 1},
+    {"course_id": "GE101", "name": "Malaysian Culture and Multi-ethnic Relations (MPU)", "credits": 2, "dept": "General Education", "prerequisites": [], "sem": "Apr", "year": 1},
+    {"course_id": "GE102", "name": "Chinese Language and Communication", "credits": 2, "dept": "General Education", "prerequisites": [], "sem": "Sep", "year": 1},
+    {"course_id": "DS201", "name": "Data Structures", "credits": 4, "dept": "School of AI and Robotics", "prerequisites": ["CS101"], "sem": "Sep", "year": 2},
+    {"course_id": "CS201", "name": "Discrete Mathematics", "credits": 3, "dept": "School of AI and Robotics", "prerequisites": ["MA102"], "sem": "Apr", "year": 2},
+    {"course_id": "CS202", "name": "Digital Logic Design", "credits": 3, "dept": "School of AI and Robotics", "prerequisites": [], "sem": "Apr", "year": 2},
+    {"course_id": "IT202", "name": "Database Systems", "credits": 3, "dept": "School of AI and Robotics", "prerequisites": ["DS201"], "sem": "Apr", "year": 2},
+    {"course_id": "CS301", "name": "Algorithm Design and Analysis", "credits": 3, "dept": "School of AI and Robotics", "prerequisites": ["DS201"], "sem": "Sep", "year": 3},
+    {"course_id": "CS302", "name": "Operating Systems", "credits": 3, "dept": "School of AI and Robotics", "prerequisites": ["DS201"], "sem": "Sep", "year": 3},
+    {"course_id": "CS303", "name": "Computer Networks", "credits": 3, "dept": "School of AI and Robotics", "prerequisites": ["CS202"], "sem": "Apr", "year": 3},
+    {"course_id": "AI301", "name": "Introduction to Artificial Intelligence", "credits": 3, "dept": "School of AI and Robotics", "prerequisites": ["MA201", "DS201"], "sem": "Sep", "year": 3},
+    {"course_id": "AI302", "name": "Machine Learning", "credits": 3, "dept": "School of AI and Robotics", "prerequisites": ["AI301"], "sem": "Apr", "year": 3},
+    {"course_id": "AI303", "name": "Deep Learning", "credits": 3, "dept": "School of AI and Robotics", "prerequisites": ["AI302"], "sem": "Sep", "year": 4},
+    {"course_id": "SC301", "name": "Big Data Analytics", "credits": 3, "dept": "School of AI and Robotics", "prerequisites": ["IT202", "MA201"], "sem": "Apr", "year": 4}
+  ]
+}

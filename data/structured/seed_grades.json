@@ -1,0 +1,15 @@
+{
+  "_meta": {
+    "description": "演示用成绩单:虚构的大一新生九月学期成绩(GPA 工具的演示数据)",
+    "note": "完全虚构,不含任何真实个人成绩;GPA 计算规则 A=4.0 / A-=3.7 / B+=3.3 / B=3.0 / B-=2.7,与 XMUM 4.0 制一致",
+    "fictional": true
+  },
+  "student_profile": {"grade": "Year 1", "semester": "September Semester 2026"},
+  "records": [
+    {"course_id": "CS101", "score": 91, "letter": "A", "grade_point": 4.0},
+    {"course_id": "MA101", "score": 82, "letter": "B+", "grade_point": 3.3},
+    {"course_id": "MA102", "score": 88, "letter": "A-", "grade_point": 3.7},
+    {"course_id": "EN101", "score": 85, "letter": "A-", "grade_point": 3.7},
+    {"course_id": "LC101", "score": 76, "letter": "B", "grade_point": 3.0}
+  ]
+}

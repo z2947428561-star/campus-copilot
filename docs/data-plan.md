@@ -18,6 +18,14 @@
 
 → 产出物:`data/structured/seed_*.json` 5 个文件 + 建库脚本。一个周末造完。
 
+**进度(2026-09-14):5 张表已完成**(基于学校官网 www.xmu.edu.my 真实信息构造):
+- `seed_academic_cal.json` —— **真实校历**:九月学期 2026(9-25 注册 / 14 教学周 / 复习周 / 考试周 / 学期假期 + 学期内公共假期),来源 XMUM 官方 Academic Calendar
+- `seed_courses.json` —— 20 门课,参考 XMUM 计算机类专业真实体系(School of AI and Robotics / 数学系 / Language Centre / 含 MPU 马来西亚必修课),英文课程名,含先修链
+- `seed_classrooms.json` —— Block A 共 24 间(lecture hall / classroom / tutorial 三型)
+- `seed_timetable.json` —— 33 条占用记录(周一至周五 × 5 时段),空教室 = 全量组合减去本表
+- `seed_grades.json` —— 虚构大一成绩 5 门(GPA 工具演示数据)
+- 待写:`scripts/init_db.py` 建库脚本
+
 ### 非结构化:3 类文档 —— 唯一需要真去收集的(M5 前)
 
 按验收问题倒推,最小 10 份:

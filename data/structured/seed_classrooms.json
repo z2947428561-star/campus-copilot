@@ -1,0 +1,34 @@
+{
+  "_meta": {
+    "description": "教室库:Block A 一栋楼的模拟教室清单(XMUM 教学楼以 Block 命名)",
+    "note": "type 含 lecture_hall(阶梯大教室)/ classroom(标准教室)/ tutorial(小班讨论室);项目演示用模拟数据,精确房间布局以学校实际为准",
+    "fictional": true
+  },
+  "building": "Block A",
+  "rooms": [
+    {"room_id": "A101", "type": "lecture_hall", "capacity": 120, "has_projector": true, "has_ac": true},
+    {"room_id": "A102", "type": "lecture_hall", "capacity": 120, "has_projector": true, "has_ac": true},
+    {"room_id": "A103", "type": "lecture_hall", "capacity": 120, "has_projector": true, "has_ac": true},
+    {"room_id": "A104", "type": "lecture_hall", "capacity": 150, "has_projector": true, "has_ac": true},
+    {"room_id": "A105", "type": "classroom", "capacity": 60, "has_projector": true, "has_ac": true},
+    {"room_id": "A106", "type": "classroom", "capacity": 60, "has_projector": true, "has_ac": true},
+    {"room_id": "A107", "type": "classroom", "capacity": 60, "has_projector": true, "has_ac": true},
+    {"room_id": "A108", "type": "classroom", "capacity": 60, "has_projector": true, "has_ac": true},
+    {"room_id": "A109", "type": "classroom", "capacity": 60, "has_projector": true, "has_ac": true},
+    {"room_id": "A110", "type": "classroom", "capacity": 60, "has_projector": true, "has_ac": true},
+    {"room_id": "A111", "type": "classroom", "capacity": 60, "has_projector": true, "has_ac": true},
+    {"room_id": "A112", "type": "classroom", "capacity": 60, "has_projector": true, "has_ac": true},
+    {"room_id": "A201", "type": "tutorial", "capacity": 30, "has_projector": false, "has_ac": true},
+    {"room_id": "A202", "type": "tutorial", "capacity": 30, "has_projector": false, "has_ac": true},
+    {"room_id": "A203", "type": "tutorial", "capacity": 30, "has_projector": false, "has_ac": true},
+    {"room_id": "A204", "type": "tutorial", "capacity": 30, "has_projector": false, "has_ac": true},
+    {"room_id": "A205", "type": "tutorial", "capacity": 30, "has_projector": false, "has_ac": true},
+    {"room_id": "A206", "type": "tutorial", "capacity": 30, "has_projector": false, "has_ac": true},
+    {"room_id": "A207", "type": "tutorial", "capacity": 30, "has_projector": false, "has_ac": true},
+    {"room_id": "A208", "type": "tutorial", "capacity": 30, "has_projector": false, "has_ac": true},
+    {"room_id": "A209", "type": "tutorial", "capacity": 30, "has_projector": false, "has_ac": true},
+    {"room_id": "A210", "type": "tutorial", "capacity": 30, "has_projector": false, "has_ac": true},
+    {"room_id": "A211", "type": "tutorial", "capacity": 30, "has_projector": false, "has_ac": true},
+    {"room_id": "A212", "type": "tutorial", "capacity": 30, "has_projector": false, "has_ac": true}
+  ]
+}
