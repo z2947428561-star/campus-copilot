@@ -21,17 +21,17 @@
 
 **DoD**:连续对话记得上文;改提示词只动模板。——三轮管道测试通过(第 2 轮准确回答用户姓名与专业);人设集中在 prompt.py。
 
-## M2 Agent + 结构化数据工具(前置:P33-P63)- 进行中
+## M2 Agent + 结构化数据工具(前置:P33-P63)- 完成(2026-09-14)
 
-- [x] 造种子数据 + 建库脚本:`data/structured/seed_*.json` → SQLite(5 张表已造:校历 14 周真实数据 + 课程 20 门 + 教室 24 间 + 课表 33 条 + 成绩 5 门;建库脚本待写)
-- [ ] 工具 1 `query_timetable`:查课表/空教室
-- [ ] 工具 2 `get_academic_week`:今天第几教学周/距假期周数
-- [ ] 工具 3 `calculate_gpa`:成绩计算,Pydantic 返回结构化分析报告
-- [ ] 工具 4 `query_course`:课程信息/先修链
-- [ ] 工具 5 `search_policy`(占位):关键词检索文档目录
-- [ ] create_agent 组装 + 错误处理 + 流式
+- [x] 造种子数据 + 建库脚本:`data/structured/seed_*.json` → SQLite(5 张表;scripts/init_db.py 可重跑,6 张库表 105 行)
+- [x] 工具 1 `query_timetable`:查课表/空教室(timetable.py:find_empty_classrooms + query_course_schedule)
+- [x] 工具 2 `get_academic_week`:今天第几教学周/距假期周数(含开学前/复习/考试/假期边界)
+- [x] 工具 3 `calculate_gpa`:Pydantic 结构化分析报告(GpaReport:总学分/GPA/最强/最弱/建议)
+- [x] 工具 4 `query_course`:课程信息/先修链(递归展开 + 反向依赖查询)
+- [x] 工具 5 `search_policy`(占位):文件名关键词匹配,无库时诚实声明
+- [x] create_agent 组装 + 错误处理 + 流式(assistant.py;stream_mode="messages" + 节点过滤)
 
-**DoD**:「明天上午哪有空教室」「现在第几周」「这些成绩 GPA 多少、哪门拉分」全部正确路由。
+**DoD**:「明天上午哪有空教室」「现在第几周」「这些成绩 GPA 多少、哪门拉分」全部正确路由。——管道实测通过:空教室 22 间(24-2 占用验算一致)、GPA 3.6(手算一致)、CS301 先修链 CS301←DS201←CS101 正确。
 
 ## M3 中间件 + Hook(前置:P64-P85)- 未开始
 
@@ -86,3 +86,4 @@
 | 2026-09-07 | M0 收尾:LangSmith key 接入,tracing 开启(LANGSMITH_PROJECT=campus-copilot),上报验证通过,M0 闭环 |
 | 2026-09-08 | M1 完成:model.py(模型工厂)+ prompt.py(ChatPromptTemplate + MessagesPlaceholder)+ chat_cli.py(消息列表内存历史 + CLI 循环)。三轮管道测试:记忆(答出姓名专业)、人设(承认能力边界)、退出全部通过。参考实现由向导编写,用户自写一遍吸收中 |
 | 2026-09-14 | 学校确认:厦门大学马来西亚分校(XMUM)。种子数据完成:校历用官网真实数据(九月学期 2026,14 教学周),课程/教室/课表/成绩为参考真实结构的模拟数据;JSON 合法性与先修链完整性已验证 |
+| 2026-09-14 | M2 完成:scripts/init_db.py(6 表 105 行)→ 6 个工具(timetable/academic/gpa/courses/policy)→ create_agent 组装。管道验收:三类指令路由正确,空教室 22 间与 GPA 3.6 均手算复核一致。已知待优化:Agent 工具调用前偶有英文前言,已在 system_prompt 加中文约束 |
