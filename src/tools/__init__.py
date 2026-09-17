@@ -3,6 +3,7 @@ from .academic import get_academic_week
 from .courses import query_course
 from .gpa import calculate_gpa
 from .policy import search_policy
+from .profile import read_profile, save_profile
 from .timetable import find_empty_classrooms, query_course_schedule
 
 ALL_TOOLS = [
@@ -12,4 +13,6 @@ ALL_TOOLS = [
     calculate_gpa,
     query_course,
     search_policy,
+    save_profile,
+    read_profile,
 ]

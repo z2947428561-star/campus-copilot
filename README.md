@@ -27,17 +27,17 @@
 
 | 课程模块 | 落点 | 状态 |
 |---|---|---|
-| 模型调用(P11-24) | DeepSeek API + Ollama 双通道、init_chat_model、流式 | 未开始 |
-| 提示词模板(P25-32) | 系统提示词模板化、MessagesPlaceholder 注入历史 | 未开始 |
-| 工具(P33-40) | 5 个自定义工具(@tool + args_schema):课表查询 / 教学周计算 / GPA 计算 / 空教室 / 课程先修关系 | 未开始 |
-| 结构化输出(P41-50) | GPA 分析报告(Pydantic schema:总绩点/拉分课程/建议)、课程推荐结果 | 未开始 |
-| Agent(P51-63) | create_agent 组装 + 错误处理 + 流式;工具路由混合 RAG 与 DB | 未开始 |
-| 中间件(P64-78) | Summarization(长对话)/ HITL(敏感操作确认)/ PII / ModelFallback(DeepSeek→Ollama) | 未开始 |
-| Hook(P79-85) | wrap_model_call / wrap_tool_call:日志 + 耗时审计 | 未开始 |
-| 短期记忆(P86-95) | PostgreSQL 多用户会话持久化 + 消息裁剪 | 未开始 |
-| 长期记忆(P96-101) | 用户画像(年级/专业/培养进度/常问话题)在工具内读写 | 未开始 |
-| RAG(P102-116) | 教务文档管线:加载→切分→Embedding→Milvus(带 school/doc_type 元数据过滤) | 未开始 |
-| 部署(P89-91,117-120) | FastAPI + Docker Compose(app + Milvus + PG)上云 | 未开始 |
+| 模型调用(P11-24) | DeepSeek API + Ollama 双通道、init_chat_model、流式 | ✅ M0 |
+| 提示词模板(P25-32) | 系统提示词模板化、MessagesPlaceholder 注入历史 | ✅ M1 |
+| 工具(P33-40) | 5 个自定义工具(@tool + args_schema):课表查询 / 教学周计算 / GPA 计算 / 空教室 / 课程先修关系 | ✅ M2 |
+| 结构化输出(P41-50) | GPA 分析报告(Pydantic schema:总绩点/拉分课程/建议)、课程推荐结果 | ✅ M2 |
+| Agent(P51-63) | create_agent 组装 + 错误处理 + 流式;工具路由混合 RAG 与 DB | ✅ M2 |
+| 中间件(P64-78) | Summarization(长对话)/ HITL(敏感操作确认)/ PII / ModelFallback(DeepSeek→Ollama) | ✅ M3 |
+| Hook(P79-85) | wrap_model_call / wrap_tool_call:日志 + 耗时审计 | ✅ M3 |
+| 短期记忆(P86-95) | 会话持久化 + 消息裁剪(SQLite 落盘,M6 换 PG 一行配置) | ✅ M4 |
+| 长期记忆(P96-101) | 用户画像(年级/专业/常问话题)在工具内读写 | ✅ M4 |
+| RAG(P102-116) | 教务文档管线:加载→切分→bge-m3→Chroma(带 source/doc_type 元数据过滤,含来源引用) | ✅ M5 |
+| 部署(P89-91,117-120) | FastAPI/SSE 流式服务 + Web 页 + 评估集 31 问(81%)+ Docker Compose(app+PG) | ✅ M6(云部署待用户) |
 
 ## 架构
 
@@ -69,6 +69,34 @@ run_chat.cmd
 ```
 
 双击 `run_chat.cmd` 也行。它内部固定使用项目自己的解释器,不受当前 PATH 和是否 `conda activate` 影响,并且会把 cmd 码页切成 UTF-8(否则中文输入输出会乱码)。
+
+M3 中间件版 Agent(PII 脱敏/长对话压缩/模型降级/GPA 前确认/审计日志):
+
+```
+run_mw.cmd
+```
+
+M4 记忆版 Agent(多用户登录/会话落盘重启续聊/长期画像):
+
+```
+run_mem.cmd
+```
+
+M6 Web 版(浏览器聊天,流式输出 + 敏感操作网页确认):
+
+```
+run_web.cmd
+```
+
+然后浏览器打开 http://127.0.0.1:8000。
+
+## 质量与部署
+
+- **评估**:31 问评估集(`scripts/eval_set.json`),综合通过率 81%,工具路由 22/26,
+  报告见 `docs/eval-results.md`;评估方法与失败归因记录在 `docs/milestones.md` M6 节
+- **简历素材**:`docs/resume.md`(数字均来自实测)
+- **Docker 部署**:`Dockerfile` + `docker-compose.yml`(app + PostgreSQL;
+  本机无 Docker 未验证,首次部署检查清单在 compose 头部注释)
 
 **方式二:手动激活环境**
 

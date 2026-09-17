@@ -1,0 +1,66 @@
+# Campus Copilot 部署编排(app + PostgreSQL)
+#
+# ⚠️ 未在本机验证(开发机无 Docker)。首次部署检查清单:
+# 1. PG 记忆模式需先: pip install langgraph-checkpoint-postgres "psycopg[binary]"
+#    (本地未装故没锁进 requirements.txt,部署时装到镜像或加 requirements-deploy.txt)
+# 2. Embedding 依赖 Ollama bge-m3 —— 云上要么开下面的 ollama profile,
+#    要么把 OllamaEmbeddings 的 base_url 指向宿主机/独立 GPU 机器
+# 3. data/chroma_db 已随镜像带入;重建知识库: docker compose exec app python scripts/build_kb.py
+#
+# 常用命令:
+#   docker compose up -d --build          # 起全部服务
+#   docker compose --profile ollama up -d  # 连本地 Ollama 一起起
+#   docker compose logs -f app
+
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - LANGSMITH_API_KEY=${LANGSMITH_API_KEY}
+      - LANGSMITH_TRACING=${LANGSMITH_TRACING:-true}
+      - LANGSMITH_PROJECT=campus-copilot
+      # M4 设计的开关:SQLite(默认)→ PostgreSQL 一行切换,业务代码零改动
+      - MEMORY_BACKEND=postgres
+      - DATABASE_URL=postgresql://campus:campus_pw@postgres:5432/campus
+      # 容器访问宿主机 Ollama(不开 ollama profile 时)
+      - OLLAMA_HOST=http://host.docker.internal:11434
+    depends_on:
+      postgres:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=campus
+      - POSTGRES_PASSWORD=campus_pw
+      - POSTGRES_DB=campus
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U campus"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  # 可选:云端自带 Ollama(bge-m3 embedding + qwen3 降级备胎)
+  # 镜像约 1-2GB,小水管服务器慎用;开了之后把上面 OLLAMA_HOST 改为 http://ollama:11434
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ["ollama"]
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+
+  # 预留:若 M5 后续从 Chroma 迁到 Milvus,取消注释并给 build_kb.py 换向量库类
+  # etcd/milvus/minio 三件套按官方 compose 模板加
+
+volumes:
+  pgdata:
+  ollama_data:

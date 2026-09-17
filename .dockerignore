@@ -1,0 +1,10 @@
+.venv/
+.env
+__pycache__/
+*.pyc
+.git/
+.idea/
+.vscode/
+data/memory.db
+data/chroma_db/
+docs/eval-results.md

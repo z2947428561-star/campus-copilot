@@ -69,7 +69,7 @@ def calculate_gpa() -> dict:
             f"绩点偏低,{weakest.course_id} 需要优先补救,建议预约任课老师 office hour 并调整时间分配。",
         )
 
-    return GpaReport(
+    report = GpaReport(
         total_credits=total,
         weighted_gpa=gpa,
         strongest=strongest,
@@ -77,3 +77,21 @@ def calculate_gpa() -> dict:
         level=level,
         advice=advice,
     ).model_dump()
+
+    # M4:把本次 GPA 结果顺手写进长期画像(工具内写记忆的示范)。
+    # store 未挂载(裸 CLI/测试)时静默跳过,不影响主流程。
+    try:
+        from langgraph.config import get_config, get_store
+
+        user = (get_config() or {}).get("configurable", {}).get("user_id")
+        if user:
+            store = get_store()
+            store.put(
+                ("profiles", user),
+                "latest_gpa",
+                {"value": f"{gpa}({level}),最弱 {weakest.course_id} {weakest.letter}"},
+            )
+    except Exception:
+        pass  # 记忆系统不在场,不拦正事
+
+    return report

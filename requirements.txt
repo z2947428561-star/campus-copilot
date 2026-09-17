@@ -4,8 +4,20 @@ langchain-openai==1.6.0
 python-dotenv==1.2.3
 langsmith==0.12.2
 
+# M4 (P86-101): 记忆持久化 —— SQLite 后端
+# (pgserver 无 Windows 包、本机无 PG/Docker,开发期用 SQLite,
+#   M6 Docker Compose 上 PG 后:加装 langgraph-checkpoint-postgres + psycopg,
+#   并设 MEMORY_BACKEND=postgres 即可,业务代码零改动)
+langgraph-checkpoint-sqlite==3.1.1
+
+# M5 (P102-116): RAG 知识库 —— Chroma 嵌入式向量库 + Ollama bge-m3 向量化
+# (Milvus 标准版需 Docker、Milvus Lite 不支持 Windows → 开发期用 Chroma,
+#   LangChain 接口同构,迁移只换向量库类;M6 若上 Docker 可切 Milvus)
+chromadb==1.5.9
+langchain-chroma==1.1.0
+langchain-ollama==1.1.0
+langchain-text-splitters==1.1.2
+pypdf==6.19.0
+
 # 后续里程碑待装:
-# M2 (P33-63): pydantic (sqlite3 为标准库,无需安装)
-# M4 (P86-101): psycopg[binary] 或课程指定 PG 相关包
-# M5 (P102-116): pymilvus, pypdf, langchain-milvus 及课程指定 loader
-# M6: fastapi, uvicorn
+# M6: fastapi, uvicorn, langgraph-checkpoint-postgres, psycopg[binary]

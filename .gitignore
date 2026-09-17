@@ -12,6 +12,7 @@ venv/
 # Data: raw docs & seeds are tracked; generated/vector data are not
 data/processed/
 data/vector/
+data/chroma_db/
 *.db
 
 # IDE
