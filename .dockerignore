@@ -1,3 +1,13 @@
+# Docker 构建上下文排除项
+#
+# 本次修订的起因:原文件第 9 行排除了 data/chroma_db/,而 Dockerfile 里写着
+#   COPY data/ data/
+# 结果镜像里根本没有知识库,search_policy 会直接返回"知识库未接入" ——
+# RAG 整个功能在容器里是空的。
+#
+# 现在知识库后端已改为 Milvus(第10章 §2.5.2 p52),向量数据存在 milvus 卷里,
+# 不随镜像走;chroma_db 只作过渡后端保留,因此不再排除它。
+
 .venv/
 .env
 __pycache__/
@@ -5,6 +15,13 @@ __pycache__/
 .git/
 .idea/
 .vscode/
+
+# 运行时产物:不要把开发机的会话库带进镜像
 data/memory.db
-data/chroma_db/
+data/memory.db-wal
+data/memory.db-shm
+data/campus.db
+
+# 课程素材/临时目录(仅供本地对照课件使用,不进镜像)
+.tmp_course/
 docs/eval-results.md

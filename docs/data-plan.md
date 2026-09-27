@@ -24,7 +24,10 @@
 - `seed_classrooms.json` —— Block A 共 24 间(lecture hall / classroom / tutorial 三型)
 - `seed_timetable.json` —— 33 条占用记录(周一至周五 × 5 时段),空教室 = 全量组合减去本表
 - `seed_grades.json` —— 虚构大一成绩 5 门(GPA 工具演示数据)
-- 待写:`scripts/init_db.py` 建库脚本
+- 2026-09-26 起，注册用户的成绩和选课另存于 `student_grades` / `student_courses`
+  （与鉴权共用 PostgreSQL/SQLite，按 `user_id` 隔离）。网页「个人数据」可自行录入、删除；
+  演示成绩只由评估脚本显式导入测试账号，不会自动作为任何人的个人成绩。
+- 已完成:`scripts/init_db.py` 可从种子文件重建结构化 SQLite 库
 
 ### 非结构化:3 类文档 —— 唯一需要真去收集的(M5 前)
 
@@ -61,6 +64,22 @@
 
 先**手工下载 10-20 份**核心文档(培养方案 + 补考重修规定 + 奖学金办法就够 M5 验收),跑通管线后再考虑写脚本批量采集。写采集脚本本身也能写进简历(爬虫+清洗),但别让它阻塞主线。
 
+> **实际执行记录(2026-09 改造时补)**:
+> - 官网手册 PDF 是**图片版、无文本层**,`pypdf` 抽不出字 —— 这正是课件第10章
+>   §2.2.4(p12-16)列出的"扫描版 PDF"挑战,课件给的解法是 **MinerU 在线解析**
+>   (p13-16,需 `MINERU_API_TOKEN`),本项目**未接入**。
+> - 因此 16 份文档以**人工整理并固化为离线快照**的形式落在
+>   `data/raw_docs/*.md`(写入脚本 `scripts/archive_docs.py`,原名 `collect_docs.py`)。
+>   该脚本**不含网络采集代码**(全文件唯一 import 是 `pathlib`),
+>   不要把它表述为爬虫或"逐字摘录"。
+> - 后续若要补真正的采集能力,建议做成 `--online` 分支并走 MinerU,而不是用
+>   `PyPDFLoader` 硬啃图片版 PDF(课件 p12 已说明这条路的失败原因)。
+> - 来源 URL 与 doc_type 均写在各文档的 front matter 里,随 chunk 一起进入向量库
+>   (课件 §2.3.3 p26、§2.5.3 p61 的"元数据随片段传播")。
+>
+> 第二项"采集日期"**未落实**:front matter 目前只有
+> `title / source / doc_type / lang` 四个字段,没有采集日期。这是待办。
+
 ## 2. 结构化数据(SQLite)
 
 先造模拟数据,schema 对齐真实形态:
@@ -81,5 +100,6 @@ grades(可选)   成绩:course_id, score, grade_point —— 用虚构数据演�
 
 ## 3. 增量与维护
 
-- 文档更新:按学期重新采集,向量库支持按 source 元数据增量重建
+- 文档更新:按学期核对公开来源快照,当前 `scripts/build_kb.py` 为全量重建；
+  尚未实现按 `source` 增量更新
 - 上线后收集同学真实提问 → LangSmith 评估集的素材来源(形成"反馈-迭代"闭环,面试好故事)

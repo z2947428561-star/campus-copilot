@@ -14,7 +14,16 @@ data/processed/
 data/vector/
 data/chroma_db/
 *.db
+# SQLite 的 WAL / 共享内存副产物:只写 *.db 会漏掉它们 ——
+# 实测 data/memory.db-wal(4.1MB)与 data/memory.db-shm 曾被 git 跟踪入库。
+*.db-wal
+*.db-shm
+backups/
+
+# 课程素材提取目录(对照课件用,不入库)
+.tmp_course/
 
 # IDE
 .idea/
 .vscode/
+.workbuddy/
