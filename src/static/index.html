@@ -212,8 +212,8 @@
     <div class="login-form">
       <h3>开始使用</h3>
       <p class="tip">登录后保存你的课程、成绩与个人学习信息。</p>
-      <label for="login-user">用户名</label><input id="login-user" placeholder="如 CST2509055" autocomplete="username" aria-describedby="username-hint">
-      <p id="username-hint" class="field-hint">新账号：3 位大写字母 + 7 位数字，中间 4 位为入学年月 YYMM。</p>
+      <label for="login-user">用户名</label><input id="login-user" autocomplete="username" aria-describedby="username-hint">
+      <p id="username-hint" class="field-hint">新账号：3 位大写字母 + 7 位数字。</p>
       <label for="login-pass">密码</label><input id="login-pass" type="password" placeholder="至少 8 位，包含字母和数字" autocomplete="current-password" aria-describedby="password-hint">
       <p id="password-hint" class="field-hint">新注册密码至少 8 位，须同时包含字母和数字。</p>
       <p id="login-err" role="alert"></p>
@@ -270,7 +270,7 @@ async function doAuth(kind) {
   $("login-err").textContent = "";
   if (kind === "register") {
     if (!/^[A-Z]{3}[0-9]{2}(?:0[1-9]|1[0-2])[0-9]{3}$/.test(username)) {
-      $("login-err").textContent = "用户名格式应如 CST2509055，入学月份须为 01–12";
+      $("login-err").textContent = "用户名需为 3 位大写字母 + 7 位数字";
       $("login-user").focus();
       return;
     }
@@ -287,7 +287,12 @@ async function doAuth(kind) {
       body: JSON.stringify({ username, password }),
     });
     const data = await resp.json();
-    if (!resp.ok) { $("login-err").textContent = data.detail || "操作失败"; return; }
+    if (!resp.ok) {
+      $("login-err").textContent = kind === "register"
+        ? "注册失败，请检查用户名和密码要求，或用户名是否已注册"
+        : data.detail || "登录失败";
+      return;
+    }
     token = data.token; whoami = data.user_id;
     localStorage.setItem("cc_token", token);
     localStorage.setItem("cc_user", whoami);

@@ -29,25 +29,25 @@ class AuthRulesTest(unittest.TestCase):
                 with TestClient(app) as client:
                     password = "Abcdefg1"
                     for username in (
-                        "cST2509055", "CS2509055", "CST2500055",
-                        "CST2513055", "CST250905", "CST250905A", "CST25090５5",
+                        "tST2601001", "TS2601001", "TST2600001",
+                        "TST2613001", "TST260100", "TST260100A", "TST26010１1",
                     ):
                         response = client.post("/api/register", json={"username": username, "password": password})
                         self.assertEqual(response.status_code, 400, username)
 
                     for weak_password in ("Abcdef1", "abcdefgh", "12345678", "密码密码12345678"):
                         response = client.post("/api/register", json={
-                            "username": "CST2509055", "password": weak_password,
+                            "username": "TST2601001", "password": weak_password,
                         })
                         self.assertEqual(response.status_code, 400, weak_password)
 
                     response = client.post("/api/register", json={
-                        "username": "CST2509055", "password": password,
+                        "username": "TST2601001", "password": password,
                     })
                     self.assertEqual(response.status_code, 200, response.text)
-                    self.assertEqual(response.json()["user_id"], "CST2509055")
+                    self.assertEqual(response.json()["user_id"], "TST2601001")
                     response = client.post("/api/login", json={
-                        "username": "CST2509055", "password": password,
+                        "username": "TST2601001", "password": password,
                     })
                     self.assertEqual(response.status_code, 200, response.text)
 

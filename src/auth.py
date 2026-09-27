@@ -157,7 +157,7 @@ def register(username: str, password: str) -> str:
     """注册并直接签发 token(免二次登录)。"""
     username = (username or "").strip()
     if not _USERNAME_RE.fullmatch(username):
-        raise AuthError("用户名需为 3 位大写专业缩写 + 入学年月 YYMM + 3 位数字，如 CST2509055")
+        raise AuthError("用户名需为 3 位大写字母 + 7 位数字")
     if (len(password or "") < MIN_PASSWORD_LEN
             or not re.search(r"[A-Za-z]", password)
             or not re.search(r"[0-9]", password)):
