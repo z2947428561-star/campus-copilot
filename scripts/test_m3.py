@@ -8,13 +8,16 @@ DoD 对照(docs/milestones.md):
 5. 多中间件执行顺序                              → test_pii() 里顺带验证
    (PII 在最外层先处理消息,压缩在后 —— 通过日志时序观察)
 
-运行(项目根目录):.venv\\Scripts\\python scripts\\test_m3.py
+运行(项目根目录):.venv\\python.exe scripts\\test_m3.py
 会真实调用 DeepSeek / Ollama,产生少量 API 费用(分币级)。
 """
 import logging
 import os
 import sys
 from pathlib import Path
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(errors="backslashreplace")
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))  # 让 agent/ tools/ model 可导入
@@ -28,7 +31,6 @@ from langgraph.types import Command  # noqa: E402
 
 from agent.middleware import (  # noqa: E402
     _detect_pii,
-    get_ollama_model,
     pii_guard,
 )
 from model import get_chat_model  # noqa: E402
@@ -82,12 +84,17 @@ def test_pii():
     order = [type(m).__name__ for m in get_middlewares()]
     print(f"        中间件栈(外→内): {order}")
     check("PII 位于最外层(第 1 个)", order[0] == "PIIMiddleware")
-    check("栈共 6 层:PII→压缩→模型审计→降级→工具审计→HITL", len(order) == 6)
+    # 栈在 M3 后扩过一轮:新增 ModelCallLimit/ToolCallLimit(课件 §3.1/§3.2),
+    # 现为 9 层，另有个人 GPA 明确路由钩子。
+    check(
+        "栈共 9 层:含 GPA 路由与 HITL",
+        len(order) == 9 and "GpaToolChoiceHook" in order and order[-1] == "HumanInTheLoopMiddleware",
+    )
 
 
-# ---------------------------------------------------------------- 1. 模型降级(云→本地)
+# ---------------------------------------------------------------- 1. 模型降级(云→备胎)
 def test_fallback():
-    print("\n[2/4] 模型降级:DeepSeek 错误 key → Ollama qwen3:0.6b 兜底")
+    print("\n[2/4] 模型降级:DeepSeek 错误 key → 备胎兜底")
 
     os.environ["DEEPSEEK_API_KEY"] = "sk-this-key-is-wrong-on-purpose"  # 模拟配错
     try:
@@ -97,13 +104,17 @@ def test_fallback():
 
         reload(model_mod)  # 重载让 get_chat_model 拿到坏 key
 
+        # ⚠️ 备胎必须与主模型**不同源**,否则等于没有降级:
+        #    实测"备=同厂商模型"在坏 key 下同样 401 崩掉,而"备=Ollama"能兜住。
+        #    所以这里显式用本机 Ollama 作备胎(即 get_fallback_model() 的默认行为)。
+        backup = model_mod.get_fallback_model()
         agent = create_agent(
             model=model_mod.get_chat_model(),
             tools=ALL_TOOLS,
             system_prompt=SYSTEM_PROMPT,
             middleware=[ModelFallbackMiddleware(
                 model_mod.get_chat_model(),
-                get_ollama_model(),
+                backup,
             )],
         )
         result = agent.invoke(
@@ -112,7 +123,9 @@ def test_fallback():
         final = result["messages"][-1].content
         if isinstance(final, list):
             final = "".join(b.get("text", "") for b in final if isinstance(b, dict))
+        meta = getattr(result["messages"][-1], "response_metadata", {}) or {}
         print(f"        最终回答(前 80 字): {str(final)[:80]}")
+        print(f"        实际使用的模型: {meta.get('model_name')}")
         check("配错 key 不崩溃且拿到回答", bool(str(final).strip()))
     finally:
         # 还原真实 key(从 .env 重新加载)

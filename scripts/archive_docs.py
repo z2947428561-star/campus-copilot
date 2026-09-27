@@ -1,13 +1,25 @@
-"""M5 第一步:把收集到的 XMUM 公开教务文档归档为 data/raw_docs/*.md。
+"""把 XMUM 公开教务文档快照写入 data/raw_docs/*.md。
 
-来源说明(重要,合规红线):
-- 全部内容来自 www.xmu.edu.my 官网公开发布的学生手册 PDF / 招生页面,
-  逐字摘录官方规定原文,每份文档头部标注来源 URL。
-- 原文为英文,保留英文原文(检索引用时必须命中原文),关键处附中文要点,
+⚠️ 名称与实际行为的说明(重要,别误读):
+    本脚本**不含任何网络采集代码** —— 全文件唯一的 import 是 `pathlib`,
+    16 份文档的正文全部硬编码在下面的 `DOCS` 常量里,`main()` 只做写文件。
+    它是"离线快照写入器",不是爬虫。
+    原名 `collect_docs.py` 会让人以为它真的去采集,故更名为 `archive_docs.py`。
+
+来源与合规(为什么保留硬编码):
+- 正文来自 www.xmu.edu.my 公开发布的学生手册 PDF / 招生页面，
+  以及 zs.xmu.edu.cn 的中国招生简章页面;每份文档头部标注来源 URL。
+- 官网手册 PDF 是**图片版、无文本层**(pypdf 抽不出字),这是课件第10章
+  §2.2.4(p12-16)列出的"扫描版 PDF"挑战。课件给的解法是 MinerU 在线解析
+  (§2.2.4 p13-16,需要 MINERU_API_TOKEN);本项目暂未接入,
+  因此正文以人工整理的形式固化为快照,保证离线可复现、不依赖网络。
+- 原文为英文时保留英文(检索引用必须命中原文),关键处附中文要点,
   兼顾中文提问的跨语言召回。
-- 本脚本一次性归档,重跑覆盖;原始 PDF(图片版无文本层)不保留。
 
-运行:.venv\\python scripts\\collect_docs.py
+跑法(项目根目录):
+    .venv\\python scripts\\archive_docs.py     # 重跑覆盖,可重复执行
+之后建库:
+    .venv\\python scripts\\build_kb.py
 """
 from pathlib import Path
 
@@ -455,12 +467,14 @@ Academic Affairs Office: Room A3#702, xmumac@xmu.edu.my, Mon–Fri 8.30am–5.30
 
 
 def main():
+    """把 DOCS 里的 16 份快照写入 data/raw_docs/。
+
+    注意:这里没有下载/解析步骤 —— 见模块 docstring 的说明。
+    旧版此处会删除两个"抓取临时文件"(_download_ug2025.pdf / _ug2025_full.txt),
+    但本脚本从没有代码生成过它们,属早期爬虫版本的残留,已删除
+    (避免让人误以为存在采集能力)。
+    """
     DOCS_DIR.mkdir(parents=True, exist_ok=True)
-    # 清掉抓取过程的临时文件
-    for tmp in ("_download_ug2025.pdf", "_ug2025_full.txt"):
-        p = DOCS_DIR / tmp
-        if p.exists():
-            p.unlink()
 
     for filename, meta, body in DOCS:
         content = f"---\n{meta}---\n{body}"
@@ -468,6 +482,7 @@ def main():
         print(f"写入 {filename}")
 
     print(f"\n共 {len(DOCS)} 份文档 → {DOCS_DIR}")
+    print("下一步:.venv\\python scripts\\build_kb.py  (建向量库)")
 
 
 if __name__ == "__main__":

@@ -1,93 +1,68 @@
 """M4:记忆版 CLI —— 持久化会话 + 用户画像,重启不丢。
 
-与 M3 chat_agent_mw_cli.py 的差异:
-- InMemorySaver → SqliteSaver(data/memory.db):进程退出会话不丢
-- 新增 store:长期画像按用户隔离("profiles", user_id)
+课程对应:
+    第09章 §2.1.3(p11)    同 thread_id 共享记忆、异 thread_id 完全隔离
+    第09章 §2.2(p14-18)   外部存储持久化(checkpointer)
+    第09章 §3.1.3(p39-41) store → namespace → key → value
+    第09章 §4.2(p74-80)   用户身份由 context 显式传入
+    第08章 §2.2(p13-19)   HITL 中断→恢复
+
+与 M3 的差异:
+- checkpointer:InMemorySaver → 持久化实现(默认 SQLite,可切 PostgreSQL)
+- 新增 store:长期画像按用户隔离,namespace = ("profiles", user_id)
 - 启动时问用户名:user_id 定画像命名空间,thread_id 定短期会话
 - 同一用户再次启动 → 自动接上上次的话题续聊
 
-体验要点(对应 M4 DoD):
-- 换个用户名登录 → 完全另一段会话、另一份画像(多用户隔离)
+体验要点:
+- 换个用户名 → 完全另一段会话、另一份画像(多用户隔离)
 - 关掉窗口重开、输入同一用户名 → 上次聊到哪继续(重启可恢复)
 
-运行(项目根目录,CMD):
-    cd /d "E:\\Campus Copilot"
-    .venv\\python src\\chat_memory_cli.py
+本次修订:
+    用户身份不再只塞在 configurable 里,而是通过 context=UserContext(...)
+    显式传入(第09章 §4.2 p74-80)—— 工具的 ToolRuntime 从 runtime.context 读。
+
+运行(项目根目录):
+    run_mem.cmd  或  .venv\\python src\\chat_memory_cli.py
 """
-import logging
-import sys
+import bootstrap  # noqa: F401 —— 先执行(设置 sys.path / 编码)
 
-from langgraph.types import Command
+bootstrap.setup_logging()
+bootstrap.setup_langsmith()
 
-from agent.assistant import get_agent
-
-sys.stdin.reconfigure(encoding="utf-8")
-sys.stdout.reconfigure(encoding="utf-8")
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(message)s",
-    datefmt="%H:%M:%S",
-    stream=sys.stderr,
-)
-logging.getLogger("httpx").setLevel(logging.WARNING)
-logging.getLogger("openai").setLevel(logging.WARNING)
+from agent.assistant import get_agent  # noqa: E402
+from agent.runtime import default_thread_id, make_config  # noqa: E402
+from agent.streaming import stream_turn  # noqa: E402
+from context import UserContext  # noqa: E402
 
 EXIT_WORDS = {"exit", "quit", "退出"}
 
 
-def _print_model_chunk(chunk, metadata) -> str:
-    """只打印模型节点的文本 token(工具节点不进聊天界面)。"""
-    if metadata.get("langgraph_node") != "model":
-        return ""
-    text = chunk.content
-    if isinstance(text, list):
-        text = "".join(b.get("text", "") for b in text if isinstance(b, dict))
-    if text:
-        print(text, end="", flush=True)
-    return text or ""
-
-
-def run_turn(agent, inputs, cfg) -> str:
-    """流式输出一轮;遇 HITL 中断则确认后继续(同 M3)。"""
-    full_reply = ""
-    pending = None
-
-    while True:
-        for mode, data in agent.stream(inputs, cfg, stream_mode=["messages", "updates"]):
-            if mode == "messages":
-                chunk, metadata = data
-                full_reply += _print_model_chunk(chunk, metadata)
-            elif mode == "updates" and data.get("__interrupt__"):
-                pending = data["__interrupt__"][0]
-
-        if pending is None:
-            return full_reply
-
-        req = pending.value if isinstance(pending.value, dict) else {}
-        actions = req.get("action_requests", [])
-        for a in actions:
-            print(f"\n⚠️  {a.get('description', '该工具属于敏感操作')}")
-            print(f"   即将执行: {a.get('name', '未知工具')}({a.get('args', {})})")
-        answer = input("   放行吗?(y=放行 / 其他=拒绝): ").strip().lower()
-        decision = (
-            {"type": "approve"}
-            if answer == "y"
-            else {"type": "reject", "message": "用户在终端选择了拒绝执行"}
-        )
-        inputs = Command(resume={"decisions": [decision] * max(len(actions), 1)})
-        pending = None
+def on_decide(info) -> list:
+    """HITL 交互(同 M3)。"""
+    print("\n⚠️  以下操作需要你确认:")
+    for i, action in enumerate(info.action_requests, 1):
+        print(f"   [{i}] {action.get('name', '未知工具')}({action.get('args', {})})")
+        print(f"       {action.get('description', '该工具属于敏感操作')}")
+    answer = input("   放行吗?(y=放行 / 其他=拒绝): ").strip().lower()
+    decision = (
+        {"type": "approve"}
+        if answer == "y"
+        else {"type": "reject", "message": "用户在终端选择了拒绝执行"}
+    )
+    return [decision] * max(len(info), 1)
 
 
 def main():
     agent = get_agent(with_middleware=True, with_memory=True)
 
-    # --- 多用户入口:user_id 定画像,thread_id 定会话 ---
+    # --- 多用户入口:user_id 定画像 namespace,thread_id 定短期会话 ---
     user = input("你是谁?(输入用户名,直接回车为 default): ").strip() or "default"
-    thread_id = f"{user}-main"
-    cfg = {"configurable": {"thread_id": thread_id, "user_id": user}}
+    thread_id = default_thread_id(user)
+    cfg = make_config(thread_id=thread_id, user_id=user, run_name=f"campus-cli:{user}")
+    user_context = UserContext(user_id=user)
 
-    # 探测该会话是否已有历史(重启续聊的提示)
+    # 探测该会话是否已有历史(重启续聊的提示)——
+    # 第09章 §2.1.2(p8-10)的 agent.get_state(config)
     state = agent.get_state(cfg)
     n_history = len(state.values.get("messages", [])) if state.values else 0
 
@@ -109,7 +84,14 @@ def main():
             break
 
         print("助手> ", end="", flush=True)
-        run_turn(agent, {"messages": [{"role": "user", "content": user_input}]}, cfg)
+        stream_turn(
+            agent,
+            {"messages": [{"role": "user", "content": user_input}]},
+            cfg,
+            on_decide=on_decide,
+            on_token=lambda t: print(t, end="", flush=True),
+            context=user_context,      # 第09章 §4.2 p74-80
+        )
         print()
 
 

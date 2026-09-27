@@ -1,23 +1,47 @@
-# 已安装并锁定版本(与课程 LangChain 1.2.12 一致)
+# Campus Copilot 依赖清单
+#
+# 安装:.venv\python.exe -m pip install -r requirements.txt
+#
+# 本次修订说明:原文件只声明了 10 个包,fastapi / uvicorn / pymilvus / psycopg
+# 全部写在注释里 —— 结果 Docker 镜像里 `pip install -r requirements.txt` 成功,
+# 但镜像内没有 uvicorn,容器 CMD 直接失败。现在按课件技术栈补齐。
+
+# ============================================================ 第02章 模型调用
 langchain==1.2.12
-langchain-openai==1.6.0
+langchain-openai==1.6.0          # DeepSeek 走 OpenAI 兼容网关(第02章 §2.2 p8)
 python-dotenv==1.2.3
+# 可选:装了它才能在 init_chat_model 里用 model_provider="deepseek"
+#      (第02章 §2.1.1 p4 的 ChatDeepSeek)。不装则走 openai 兼容写法,功能等价。
+# langchain-deepseek
+
+# ============================================================ 第03章 LangSmith
 langsmith==0.12.2
 
-# M4 (P86-101): 记忆持久化 —— SQLite 后端
-# (pgserver 无 Windows 包、本机无 PG/Docker,开发期用 SQLite,
-#   M6 Docker Compose 上 PG 后:加装 langgraph-checkpoint-postgres + psycopg,
-#   并设 MEMORY_BACKEND=postgres 即可,业务代码零改动)
+# ============================================================ 第07章 Agent / 第09章 记忆
+# SQLite:本地快速验证用(第09章 §2.2 p14-18 课件实操的是 PG,SQLite 是本地替代)
 langgraph-checkpoint-sqlite==3.1.1
+# PostgreSQL:课件实操后端,容器/云上必装(第09章 §2.2 p14-18)
+# 注意:BaseStore 的 PG 实现(PostgresStore)由同一个发行包提供,
+#       并没有独立的 langgraph-store-postgres 包(已核实 PyPI 无此分发名)
+langgraph-checkpoint-postgres>=3.1.2
+psycopg[binary]>=3.3.6
 
-# M5 (P102-116): RAG 知识库 —— Chroma 嵌入式向量库 + Ollama bge-m3 向量化
-# (Milvus 标准版需 Docker、Milvus Lite 不支持 Windows → 开发期用 Chroma,
-#   LangChain 接口同构,迁移只换向量库类;M6 若上 Docker 可切 Milvus)
+# ============================================================ 第10章 RAG
+# 向量库:课件用 Milvus(第10章 §2.5.2 p52"这里我们使用 Milvus")
+pymilvus>=3.0.2
+langchain-milvus>=0.4.0
+# 过渡期本地向量库(第10章 §2.5.2 p52 的对比表里也列了 Chroma)
 chromadb==1.5.9
 langchain-chroma==1.1.0
-langchain-ollama==1.1.0
 langchain-text-splitters==1.1.2
 pypdf==6.19.0
 
-# 后续里程碑待装:
-# M6: fastapi, uvicorn, langgraph-checkpoint-postgres, psycopg[binary]
+# ============================================================ 第06章 结构化输出
+pydantic>=2.7
+
+# ============================================================ 第07章 Web 服务化(课件未覆盖)
+fastapi>=0.141
+uvicorn[standard]>=0.53
+
+# ============================================================ 测试
+pytest>=8.0
