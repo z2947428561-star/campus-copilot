@@ -1,0 +1,13 @@
+# 与 /home/kiyotaka/milvus/docker-compose.yml 一起使用。
+# docker compose -f /home/kiyotaka/milvus/docker-compose.yml \
+#   -f '/mnt/e/Campus Copilot/ops/milvus-local-ports.yml' up -d
+# 仅覆盖宿主机端口绑定；Milvus/MinIO 数据卷沿用原配置。
+services:
+  minio:
+    ports: !override
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+  standalone:
+    ports: !override
+      - "127.0.0.1:19530:19530"
+      - "127.0.0.1:9091:9091"
