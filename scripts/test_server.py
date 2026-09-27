@@ -15,6 +15,7 @@
     因此这里给每次运行生成唯一 user_id,并按需清理测试会话。
 """
 import json
+import secrets
 import sys
 import time
 import urllib.request
@@ -24,8 +25,7 @@ from pathlib import Path
 BASE = "http://127.0.0.1:8000"
 
 # 每次运行一对独立用户 → 独立 thread_id → 独立会话,避免历史污染
-RUN_ID = time.strftime("%m%d%H%M%S")
-USER = f"webtest-{RUN_ID}"
+USER = f"TST{time.strftime('%y%m')}{secrets.randbelow(1000):03d}"
 PASSWORD = "test-pw-12345"
 
 

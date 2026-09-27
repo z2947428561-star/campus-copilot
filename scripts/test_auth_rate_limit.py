@@ -26,25 +26,25 @@ class LoginRateLimitTest(unittest.TestCase):
 
                 with patch.object(auth.config, "LOGIN_FAILURE_LIMIT", 3), TestClient(app) as client:
                     auth._login_attempts.clear()
-                    for name in ("rate-alice", "rate-bob"):
-                        response = client.post("/api/register", json={"username": name, "password": "test-password"})
+                    for name in ("AAA2509001", "BBB2509002"):
+                        response = client.post("/api/register", json={"username": name, "password": "Testpass123"})
                         self.assertEqual(response.status_code, 200, response.text)
 
                     for _ in range(3):
-                        response = client.post("/api/login", json={"username": "rate-alice", "password": "wrong"})
+                        response = client.post("/api/login", json={"username": "AAA2509001", "password": "wrong"})
                         self.assertEqual(response.status_code, 401)
-                    response = client.post("/api/login", json={"username": "rate-alice", "password": "test-password"})
+                    response = client.post("/api/login", json={"username": "AAA2509001", "password": "Testpass123"})
                     self.assertEqual(response.status_code, 429)
                     self.assertIn("Retry-After", response.headers)
-                    response = client.post("/api/login", json={"username": "rate-bob", "password": "test-password"})
+                    response = client.post("/api/login", json={"username": "BBB2509002", "password": "Testpass123"})
                     self.assertEqual(response.status_code, 200)
 
                     # 窗口过后允许重试，成功即清除失败记录。
                     with auth._login_lock:
-                        auth._login_attempts["rate-alice"].clear()
-                    response = client.post("/api/login", json={"username": "rate-alice", "password": "test-password"})
+                        auth._login_attempts["AAA2509001"].clear()
+                    response = client.post("/api/login", json={"username": "AAA2509001", "password": "Testpass123"})
                     self.assertEqual(response.status_code, 200)
-                    self.assertNotIn("rate-alice", auth._login_attempts)
+                    self.assertNotIn("AAA2509001", auth._login_attempts)
 
 
 if __name__ == "__main__":

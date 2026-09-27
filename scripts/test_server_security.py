@@ -25,11 +25,11 @@ class ServerSecurityTest(unittest.TestCase):
 
                 with TestClient(server.app) as client:
                     weak = client.post("/api/register", json={
-                        "username": "weak-test", "password": "short-pass"
+                        "username": "SEC2509001", "password": "short"
                     })
                     self.assertEqual(weak.status_code, 400)
                     response = client.post("/api/register", json={
-                        "username": "security-test", "password": "test-password"
+                        "username": "SEC2509001", "password": "Testpass123"
                     })
                     self.assertEqual(response.status_code, 200)
                     self.assertEqual(response.headers["cache-control"], "no-store")

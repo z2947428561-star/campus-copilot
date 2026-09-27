@@ -104,6 +104,7 @@
   .login-form { display: flex; flex-direction: column; justify-content: center; gap: 10px; padding: 38px; }
   .login-form h3 { margin: 0 0 5px; font-size: 22px; }
   .login-form .tip { margin: 0 0 18px; color: var(--quiet); font-size: 12px; line-height: 1.6; }
+  .login-form .field-hint { margin: 0 0 3px; color: var(--quiet); font-size: 11px; line-height: 1.55; }
   .login-form label { margin-top: 5px; font-size: 12px; font-weight: 700; }
   .login-form input { width: 100%; padding: 11px 12px; border: 1px solid var(--line); border-radius: 8px; background: #f9fbfb; color: var(--ink); font-size: 13px; }
   .login-form input:focus { border-color: var(--teal); outline: 2px solid #bbdbd5; }
@@ -211,8 +212,10 @@
     <div class="login-form">
       <h3>开始使用</h3>
       <p class="tip">登录后保存你的课程、成绩与个人学习信息。</p>
-      <label for="login-user">用户名</label><input id="login-user" placeholder="2–32 位" autocomplete="username">
-      <label for="login-pass">密码</label><input id="login-pass" type="password" placeholder="注册时至少 12 位" autocomplete="current-password">
+      <label for="login-user">用户名</label><input id="login-user" placeholder="如 CST2509055" autocomplete="username" aria-describedby="username-hint">
+      <p id="username-hint" class="field-hint">新账号：3 位大写字母 + 7 位数字，中间 4 位为入学年月 YYMM。</p>
+      <label for="login-pass">密码</label><input id="login-pass" type="password" placeholder="至少 8 位，包含字母和数字" autocomplete="current-password" aria-describedby="password-hint">
+      <p id="password-hint" class="field-hint">新注册密码至少 8 位，须同时包含字母和数字。</p>
       <p id="login-err" role="alert"></p>
       <div class="login-actions">
         <button type="button" class="primary" onclick="doAuth('login')">登录</button>
@@ -265,6 +268,18 @@ async function doAuth(kind) {
   const username = $("login-user").value.trim();
   const password = $("login-pass").value;
   $("login-err").textContent = "";
+  if (kind === "register") {
+    if (!/^[A-Z]{3}[0-9]{2}(?:0[1-9]|1[0-2])[0-9]{3}$/.test(username)) {
+      $("login-err").textContent = "用户名格式应如 CST2509055，入学月份须为 01–12";
+      $("login-user").focus();
+      return;
+    }
+    if (password.length < 8 || !/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
+      $("login-err").textContent = "密码至少 8 位，且同时包含字母和数字";
+      $("login-pass").focus();
+      return;
+    }
+  }
   try {
     const resp = await fetch("/api/" + kind, {
       method: "POST",

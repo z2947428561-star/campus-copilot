@@ -34,9 +34,10 @@ import config
 
 logger = logging.getLogger("campus")
 
-# 注册门槛:用户名 2-32 位(字母/数字/下划线/连字符/中文),新密码至少 12 位
-_USERNAME_RE = re.compile(r"^[\w一-龥-]{2,32}$", re.UNICODE)
-MIN_PASSWORD_LEN = 12
+# 新账号:专业缩写(3 个大写字母)+入学年月(YYMM)+3 位数字。
+# 只限制新注册；已有账号仍可登录，避免把本地旧数据锁在账号外。
+_USERNAME_RE = re.compile(r"[A-Z]{3}[0-9]{2}(?:0[1-9]|1[0-2])[0-9]{3}\Z")
+MIN_PASSWORD_LEN = 8
 
 _PBKDF2_ROUNDS = 120_000
 TOKEN_TTL_SECONDS = 30 * 24 * 3600  # 30 天
@@ -155,10 +156,12 @@ def _issue_token(username: str) -> str:
 def register(username: str, password: str) -> str:
     """注册并直接签发 token(免二次登录)。"""
     username = (username or "").strip()
-    if not _USERNAME_RE.match(username):
-        raise AuthError("用户名需为 2-32 位字母/数字/下划线/中文")
-    if len(password or "") < MIN_PASSWORD_LEN:
-        raise AuthError(f"密码至少 {MIN_PASSWORD_LEN} 位")
+    if not _USERNAME_RE.fullmatch(username):
+        raise AuthError("用户名需为 3 位大写专业缩写 + 入学年月 YYMM + 3 位数字，如 CST2509055")
+    if (len(password or "") < MIN_PASSWORD_LEN
+            or not re.search(r"[A-Za-z]", password)
+            or not re.search(r"[0-9]", password)):
+        raise AuthError(f"密码至少 {MIN_PASSWORD_LEN} 位，且同时包含字母和数字")
 
     salt = secrets.token_hex(16)
     try:

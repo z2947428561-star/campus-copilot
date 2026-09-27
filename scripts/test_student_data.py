@@ -29,12 +29,12 @@ class StudentDataTest(unittest.TestCase):
 
                 with TestClient(app) as client:
                     def register(name):
-                        response = client.post("/api/register", json={"username": name, "password": "test-password"})
+                        response = client.post("/api/register", json={"username": name, "password": "Testpass123"})
                         self.assertEqual(response.status_code, 200, response.text)
                         return {"Authorization": "Bearer " + response.json()["token"]}
 
-                    alice = register("alice-test")
-                    bob = register("bob-test")
+                    alice = register("AAA2509001")
+                    bob = register("BBB2509002")
                     self.assertEqual(client.get("/api/me/grades").status_code, 401)
                     self.assertEqual(client.put("/api/me/grades", headers=alice,
                         json={"course_id": "CS101", "grade_point": 3.7, "letter": "A-"}).status_code, 200)
@@ -47,10 +47,10 @@ class StudentDataTest(unittest.TestCase):
                         json={"course_id": "CS101", "grade_point": 4.5, "letter": "A"}).status_code, 422)
                     self.assertEqual(client.delete("/api/me/grades/CS101", headers=bob).status_code, 200)
                     self.assertEqual(len(client.get("/api/me/grades", headers=alice).json()["grades"]), 1)
-                    self.assertEqual(_load_grades("bob-test"), [])
-                    self.assertEqual(_load_grades("alice-test")[0].grade_point, 3.7)
-                    alice_runtime = SimpleNamespace(context=UserContext(user_id="alice-test"), store=None)
-                    bob_runtime = SimpleNamespace(context=UserContext(user_id="bob-test"), store=None)
+                    self.assertEqual(_load_grades("BBB2509002"), [])
+                    self.assertEqual(_load_grades("AAA2509001")[0].grade_point, 3.7)
+                    alice_runtime = SimpleNamespace(context=UserContext(user_id="AAA2509001"), store=None)
+                    bob_runtime = SimpleNamespace(context=UserContext(user_id="BBB2509002"), store=None)
                     self.assertEqual(json.loads(calculate_gpa.func(runtime=alice_runtime))["weighted_gpa"], 3.7)
                     self.assertFalse(json.loads(calculate_gpa.func(runtime=bob_runtime))["ok"])
                     self.assertEqual(json.loads(query_my_schedule.func(runtime=alice_runtime))["courses"][0]["course_id"], "CS101")
