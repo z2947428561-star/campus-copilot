@@ -24,6 +24,10 @@ class ServerSecurityTest(unittest.TestCase):
                 import server
 
                 with TestClient(server.app) as client:
+                    page = client.get("/")
+                    self.assertEqual(page.status_code, 200)
+                    self.assertEqual(page.headers["cache-control"], "no-store")
+
                     weak = client.post("/api/register", json={
                         "username": "SEC2509001", "password": "short"
                     })
