@@ -68,9 +68,11 @@ python -m uvicorn src.server:app --host 127.0.0.1 --port 8000
 python scripts/check_offline.py
 ```
 
-该命令只复制 `src/`、`scripts/` 和公开种子/政策文件到临时目录，不复制 `.env`、个人数据库或向量目录。先在副本中建公共种子库，再以独立进程运行六个离线测试文件，结束后清理临时目录。依赖需事先安装。
+该命令只复制 `src/`、`scripts/` 和公开种子/政策文件到临时目录，不复制 `.env`、个人数据库、向量目录或 `*.local.json` 私有种子。先在副本中建公共种子库，再以独立进程运行七个离线测试文件，结束后清理临时目录。依赖需事先安装。
 
-它覆盖账号规则、登录限流、个人数据隔离、API 错误边界、密码重置和 Chroma 重建。不会调用模型 API，也不需要 PostgreSQL / Milvus 服务。GitHub Actions 仅运行这些代码检查，不执行部署。
+它覆盖账号规则、登录限流、个人数据隔离、API 错误边界、密码重置、Chroma 重建和选课经验导入/查询。不会调用模型 API，也不需要 PostgreSQL / Milvus 服务。GitHub Actions 仅运行这些代码检查，不执行部署。
+
+用户提供的选课推荐 Excel 是可选本机数据，导入和更新只使用 `init_db.py --recommendations-only`，见[选课经验说明](course-recommendations.md)。原表、提取的本机种子和数据库均不进入 Git。
 
 ### 真实服务集成验证
 

@@ -13,6 +13,8 @@ venv/
 data/processed/
 data/vector/
 data/chroma_db/
+data/local/
+data/structured/*.local.json
 *.db
 # SQLite 的 WAL / 共享内存副产物:只写 *.db 会漏掉它们 ——
 # 实测 data/memory.db-wal(4.1MB)与 data/memory.db-shm 曾被 git 跟踪入库。

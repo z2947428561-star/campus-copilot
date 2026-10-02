@@ -24,7 +24,7 @@ sequenceDiagram
 
 1. `src/static/index.html` 管理页面、登录状态、个人数据表单与流式事件消费。
 2. `src/server.py` 校验 Bearer token，把服务端确认的身份放进 `UserContext`，再生成用户会话标识。客户端不能自行指定聊天身份。
-3. `src/agent/assistant.py` 组装模型、9 个工具、提示词、中间件、Checkpointer 和 Store；Web 按进程延迟创建并复用 Agent。
+3. `src/agent/assistant.py` 组装模型、11 个工具、提示词、中间件、Checkpointer 和 Store；Web 按进程延迟创建并复用 Agent。
 4. `src/agent/streaming.py` 统一处理模型增量、工具结果和人工确认中断。Web 的工作线程把事件送入队列，HTTP 响应边接收边发送。
 5. 工具根据用途访问公共 SQLite、个人数据存储或向量库，再由模型生成回答。GPA 由 Python 代码计算，不交给模型心算。
 
@@ -37,6 +37,7 @@ SSE 事件类型包括 `token`、`interrupt`、`done`、`error`。恢复请求�
 | 数据 | 主路径 | 本地替代 | 主要代码 |
 | --- | --- | --- | --- |
 | 公共课程、校历、教室、演示排课 | `data/campus.db`（SQLite） | 无切换，始终是 SQLite | `scripts/init_db.py`、`src/tools/` |
+| 可选本机选课经验、教师讨论、问答 | `data/campus.db` 的独立经验表 | 私有 `.local.json` 种子，不混入课程表 | `src/course_recommendations.py`、`src/tools/recommendations.py` |
 | 账号、token 哈希、个人成绩和选课 | PostgreSQL | `MEMORY_BACKEND=sqlite` 时使用 `data/memory.db` 或配置路径 | `src/auth.py`、`src/student_data.py` |
 | 会话状态、人工确认中断现场 | PostgreSQL Checkpointer | SQLite Checkpointer | `src/agent/memory.py` |
 | 长期用户画像 | PostgreSQL Store | SQLite Store | `src/agent/memory.py`、`src/tools/profile.py` |
@@ -58,7 +59,7 @@ SSE 事件类型包括 `token`、`interrupt`、`done`、`error`。恢复请求�
 | 3 | [`src/auth.py`](../src/auth.py) | 注册、PBKDF2 密码哈希、token 校验、退出和进程内限流 |
 | 4 | [`src/context.py`](../src/context.py) + [`src/agent/runtime.py`](../src/agent/runtime.py) | 用户身份、thread_id、递归限制和追踪配置的区别 |
 | 5 | [`src/agent/assistant.py`](../src/agent/assistant.py) | Agent 依赖的统一组装点，以及 CLI 各阶段的能力开关 |
-| 6 | [`src/tools/__init__.py`](../src/tools/__init__.py) | 9 个工具的清单和分组，再按下表读实现 |
+| 6 | [`src/tools/__init__.py`](../src/tools/__init__.py) | 11 个工具的清单和分组，再按下表读实现 |
 | 7 | [`src/agent/streaming.py`](../src/agent/streaming.py) | 流式输出与 HITL 中断/恢复为何能被 Web 和 CLI 共用 |
 | 8 | [`src/agent/middleware.py`](../src/agent/middleware.py) | PII 规则、摘要、GPA 路由、审计、调用限额、备用模型和确认 |
 | 9 | [`src/agent/memory.py`](../src/agent/memory.py) | Checkpointer 与 Store 的职责、后端切换、连接生命周期 |
@@ -72,6 +73,7 @@ SSE 事件类型包括 `token`、`interrupt`、`done`、`error`。恢复请求�
 | --- | --- |
 | [`src/tools/academic.py`](../src/tools/academic.py) | `get_academic_week`：日期对应的教学周、学期事件 |
 | [`src/tools/courses.py`](../src/tools/courses.py) | `query_course`：课程信息、学分与先修关系 |
+| [`src/tools/recommendations.py`](../src/tools/recommendations.py) | `search_course_recommendations` / `get_course_reviews`：按关键词找经验、查看同名课程原始评价，不生成推荐评分 |
 | [`src/tools/timetable.py`](../src/tools/timetable.py) | `find_empty_classrooms`、`query_course_schedule`、`query_my_schedule`：公共排课与个人选课关联 |
 | [`src/tools/gpa.py`](../src/tools/gpa.py) | `calculate_gpa`：读取当前用户成绩并生成结构化 GPA 报告 |
 | [`src/tools/policy.py`](../src/tools/policy.py) | `search_policy`：政策类别过滤与全库召回，整理引用信息 |
@@ -90,6 +92,7 @@ SSE 事件类型包括 `token`、`interrupt`、`done`、`error`。恢复请求�
 | `src/chat_agent_cli.py`、`chat_agent_mw_cli.py`、`chat_memory_cli.py` | 从工具 Agent 到中间件、再到持久化记忆的 CLI 学习入口 |
 | `run_chat.cmd`、`run_mw.cmd`、`run_mem.cmd`、`run_web.cmd` | Windows Conda 环境的便捷启动脚本 |
 | `scripts/init_db.py` | 从 JSON 种子重建公共 SQLite 库 |
+| `scripts/import_course_recommendations.py`、`src/course_recommendations.py` | 只读提取 Excel 到本机种子、定向更新经验表、只读访问和来源约束；不改个人数据库 |
 | `scripts/archive_docs.py` | 把整理好的政策内容写成离线快照；不是网络爬虫 |
 | `scripts/build_kb.py` | 解析政策快照、切分并写入向量库 |
 | `scripts/test_auth_*.py`、`test_reset_local_password.py` | 注册、登录、限流、旧账号兼容和重置验证 |

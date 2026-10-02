@@ -108,3 +108,17 @@ class CourseQueryInput(BaseModel):
     query: str = Field(
         description="课程代码(如 CS301)或课程名关键词(如 machine learning,中英文均可)"
     )
+
+
+class RecommendationSearchInput(BaseModel):
+    query: str = Field(default="", max_length=200, description="原表关键词，空格分隔需全部命中；空值浏览目录")
+    category: Literal["all", "Art", "Business", "Science"] = Field(default="all", description="原表课程分类；教师/问答用 all")
+    section: Literal["courses", "teachers", "faq", "all"] = Field(default="courses", description="课程经验、教师讨论或选课问答")
+    limit: int = Field(default=5, ge=1, le=10, description="每次最多返回的原始行数")
+    offset: int = Field(default=0, ge=0, description="分页偏移；has_more 为 true 时可继续查询")
+
+
+class CourseReviewsInput(BaseModel):
+    course_name: str = Field(min_length=1, max_length=200, description="搜索结果中的完整课程名称，不是课程代码")
+    limit: int = Field(default=5, ge=1, le=10, description="每页同名课程原始行数")
+    offset: int = Field(default=0, ge=0, description="分页偏移，保留所有重复行而不截断丢弃")

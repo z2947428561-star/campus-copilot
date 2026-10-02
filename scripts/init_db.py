@@ -9,12 +9,17 @@
 运行(项目根目录):.venv\\Scripts\\python scripts\\init_db.py
 """
 import json
+import argparse
+from contextlib import closing
 import sqlite3
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent  # 项目根目录(脚本在 scripts/ 下)
 DB_PATH = ROOT / "data" / "campus.db"
 SEED_DIR = ROOT / "data" / "structured"
+sys.path.insert(0, str(ROOT / "src"))
+from course_recommendations import SEED_PATH, replace_seed
 
 
 def load_seed(filename: str) -> dict:
@@ -170,6 +175,18 @@ def seed_grades(cur: sqlite3.Cursor, data: dict) -> None:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--recommendations-only", action="store_true",
+                        help="只更新选课经验表，不重建课程/校历等公共表")
+    args = parser.parse_args()
+    if args.recommendations_only:
+        if not SEED_PATH.is_file():
+            parser.error("缺少本机选课经验种子，请先运行 import_course_recommendations.py")
+        data = json.loads(SEED_PATH.read_text(encoding="utf-8"))
+        with closing(sqlite3.connect(DB_PATH)) as conn, conn:
+            count = replace_seed(conn, data)
+        print(f"已更新选课经验：{count} 行；其他表未改动。")
+        return
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
 
@@ -179,6 +196,8 @@ def main() -> None:
     seed_timetable(cur, load_seed("seed_timetable.json"))
     seed_academic_cal(cur, load_seed("seed_academic_cal.json"))
     seed_grades(cur, load_seed("seed_grades.json"))
+    if SEED_PATH.is_file():
+        replace_seed(conn, json.loads(SEED_PATH.read_text(encoding="utf-8")))
     conn.commit()
 
     print(f"数据库已重建:{DB_PATH}\n")

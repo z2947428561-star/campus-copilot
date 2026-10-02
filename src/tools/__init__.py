@@ -2,7 +2,7 @@
 
 课程对应:第05章 §6.2(p41-42)功能单一
     课件对工具数量的建议在 **第07章 §4.1(p21)**:"一般 2-5 个工具最佳",
-    "工具太多会混淆"。本项目目前有 9 个,因此这里按**场景分组**导出,
+    "工具太多会混淆"。本项目目前有 11 个,因此这里按**场景分组**导出,
     让调用方可以只挂需要的子集(参见 TOOL_GROUPS),而不是无脑全挂。
 
     同时第07章 §4.4(p26)提醒:默认没有工具调用次数限制。若某天工具继续
@@ -13,6 +13,7 @@ from .courses import query_course
 from .gpa import calculate_gpa
 from .policy import search_policy
 from .profile import read_profile, save_profile
+from .recommendations import get_course_reviews, search_course_recommendations
 from .timetable import find_empty_classrooms, query_course_schedule, query_my_schedule
 
 # 按场景分组(第07章 §4.1 p21:只给 Agent 需要的工具)
@@ -21,6 +22,7 @@ TOOL_GROUPS = {
     "schedule": [get_academic_week, find_empty_classrooms, query_course_schedule, query_my_schedule],
     # 课程与先修关系
     "curriculum": [query_course],
+    "recommendations": [search_course_recommendations, get_course_reviews],
     # 教务政策 —— RAG 检索
     "policy": [search_policy],
     # 成绩分析
@@ -36,6 +38,8 @@ ALL_TOOLS = [
     query_my_schedule,
     calculate_gpa,
     query_course,
+    search_course_recommendations,
+    get_course_reviews,
     search_policy,
     save_profile,
     read_profile,
@@ -62,6 +66,8 @@ __all__ = [
     "query_my_schedule",
     "calculate_gpa",
     "query_course",
+    "search_course_recommendations",
+    "get_course_reviews",
     "search_policy",
     "save_profile",
     "read_profile",

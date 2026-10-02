@@ -16,6 +16,7 @@ CHECKS = (
     "test_student_data.py",
     "test_server_security.py",
     "test_chroma_rebuild.py",
+    "test_course_recommendations.py",
 )
 
 
@@ -33,7 +34,7 @@ def main() -> int:
         for folder in ("src", "scripts", "data/structured", "data/raw_docs"):
             shutil.copytree(
                 ROOT / folder, workspace / folder,
-                ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".env", "*.db*"),
+                ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".env", "*.db*", "*.local.json"),
             )
         env["MEMORY_DB_PATH"] = str(workspace / "data" / "memory.db")
         for script in ("init_db.py", *CHECKS):

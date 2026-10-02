@@ -49,7 +49,8 @@ def _prereq_chain(conn: sqlite3.Connection, course_id: str, seen: set) -> list[s
     args_schema=CourseQueryInput,
     description=(
         "查询课程信息:课程名、学分、开课学院、开设学期、建议学年,以及完整先修链。"
-        "适用于「CS301 需要先修什么」「machine learning 这门课怎么样」「大二能修 XX 吗」。"
+        "适用于「CS301 需要先修什么」「machine learning 的学分是多少」「大二能修 XX 吗」。"
+        "学生选课体验、给分和教师评价请使用 search_course_recommendations。"
     ),
 )
 def query_course(query: str) -> str:

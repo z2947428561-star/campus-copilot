@@ -30,6 +30,7 @@ FIXED_VARS = {
         "空教室→find_empty_classrooms;课程上课时间→query_course_schedule;"
         "用户自己的课表→query_my_schedule;"
         "绩点分析→calculate_gpa;课程信息与先修→query_course;"
+        "选课经验/教师讨论→search_course_recommendations;某门课的原始评价→get_course_reviews;"
         "教务政策→search_policy"
     ),
     # 与 src/tools/policy.py 返回的引导语保持一致

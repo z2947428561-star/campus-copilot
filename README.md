@@ -24,8 +24,9 @@
 | 个人课程与成绩 | 在“个人数据”中录入课程、成绩，再查询个人课表或 GPA | 按登录用户隔离；新账号不会自动获得演示成绩 |
 | GPA 分析确认 | “帮我算一下这学期 GPA” | 计算前展示确认操作，网页支持批准或拒绝 |
 | 持久化记忆 | “记住我是大一学生” | 会话状态与长期画像分别保存，按用户隔离 |
+| 选课经验查询（本机可选） | “经验表里有哪些 Python 相关课程？” | 读取本机导入的学生共编表，保留出处与不同意见；原始评价不随仓库公开 |
 
-Web 支持注册、登录、退出、SSE 流式回答和个人数据管理。当前共有 **9 个 Agent 工具**；主模型默认使用 DeepSeek 的 OpenAI 兼容接口，可配置独立的备用模型和可选 LangSmith 追踪。
+Web 支持注册、登录、退出、SSE 流式回答和个人数据管理。当前共有 **11 个 Agent 工具**；主模型默认使用 DeepSeek 的 OpenAI 兼容接口，可配置独立的备用模型和可选 LangSmith 追踪。
 
 ## 架构
 
@@ -36,8 +37,9 @@ flowchart LR
     API --> Agent
     API --> UserDB[(PostgreSQL / SQLite：账号与个人数据)]
     Agent --> LLM[对话模型与可选备用模型]
-    Agent --> Tools[9 个工具]
+    Agent --> Tools[11 个工具]
     Tools --> Catalog[(SQLite：课程 / 校历 / 演示排课)]
+    Tools --> Feedback[(SQLite：可选本机选课经验)]
     Tools --> UserDB
     Tools --> RAG[政策检索 + Embedding]
     RAG --> Vector[(Milvus / Chroma)]
@@ -102,7 +104,7 @@ python -m uvicorn src.server:app --host 127.0.0.1 --port 8000
 python scripts/check_offline.py
 ```
 
-GitHub Actions 只做代码检查，不部署应用；运行相同的 6 个离线测试文件，覆盖账号规则、登录限流、个人数据隔离、API 边界、密码重置和 Chroma 重建。它不代表真实模型问答或本机 PostgreSQL / Milvus 已通过集成验证。
+GitHub Actions 只做代码检查，不部署应用；运行相同的 7 个离线测试文件，覆盖账号规则、登录限流、个人数据隔离、API 边界、密码重置、Chroma 重建及选课经验导入/查询。经验库测试只用虚构样例，不复制本机原始评价。它不代表真实模型问答或本机 PostgreSQL / Milvus 已通过集成验证。
 
 [历史评估报告](docs/eval-results.md)记录：**2026-09-26 的 32 道自建题通过 32 道，其中 27 道工具路由断言全部通过**。判定使用关键词规则和实际执行的 ToolMessage；这是一组固定题目的结果，不等于开放问题准确率，也不是本次文档更新重新跑出的数据。
 
@@ -116,6 +118,7 @@ GitHub Actions 只做代码检查，不部署应用；运行相同的 6 个离�
 | [本地开发](docs/local-development.md) | Windows / Linux 环境、配置、启动、测试与常见问题 |
 | [本机基础设施](ops/README.md) | 已有 PostgreSQL / Milvus 的本机端口绑定与数据保留注意事项 |
 | [数据说明](docs/data-plan.md) | 公开文档快照、演示种子数据及尚未接入的真实数据 |
+| [选课经验](docs/course-recommendations.md) | 本机 Excel 导入、经验搜索与原始评价查询、来源与隐私边界 |
 | [评估记录](docs/eval-results.md) | 固定测试集的历史结果与评估口径 |
 | [课程对照](docs/course-map.md) | 尚硅谷 LangChain 课程学习内容与代码落点 |
 | [开发里程碑](docs/milestones.md) | 分阶段实现过程与已记录的问题 |
