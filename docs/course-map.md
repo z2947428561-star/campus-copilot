@@ -39,7 +39,7 @@
 
 | 课件 | 项目落点 | 状态 |
 |---|---|---|
-| §2.3 四个环境变量(p6) | `.env.example`、`src/agent/runtime.py:setup_langsmith`、`docker-compose.yml` | ✅ 之前三处都缺 `LANGSMITH_ENDPOINT`,已补 |
+| §2.3 四个环境变量(p6) | `.env.example`、`src/agent/runtime.py:setup_langsmith` | ✅ 含 `LANGSMITH_ENDPOINT`，追踪默认关闭 |
 | §3 举例 3:config 里的 run_name/tags/metadata(p7-8) | `src/agent/runtime.py:make_config`,由各入口传入 | ✅ |
 | §1.2 评估:Datasets & Experiments / Evaluators(p1-2) | `scripts/eval_set.json` + `scripts/eval_m6.py`(自制) | ⚠️ 见下"口径说明" |
 
@@ -152,12 +152,11 @@
 | 项目内容 | 实现文件 | 说明 |
 |---|---|---|
 | FastAPI + SSE 服务化 | `src/server.py`、`src/static/index.html` | 课件只讲 LangChain/LangGraph,全课程无 Web 服务化与部署章节 |
-| Dockerfile / docker-compose | `Dockerfile`、`docker-compose.yml` | 同上;课件"部署"仅出现在 ch01 p4、ch02 §4(p19)、ch03(p2)三处概念性提及 |
 | 32 问评估集与自建跑批 | `scripts/eval_set.json`、`scripts/eval_m6.py` | ch03 §1.2(p1-2)讲的是 LangSmith 的 Datasets/Evaluators,本项目未用该平台功能,理由见下 |
 | 元数据过滤 + 全库召回合并 | `src/tools/policy.py` | 自研。课件第10章未涉及 Hybrid Retrieval / EnsembleRetriever / BM25 / MMR / rerank(全部零命中) |
 | 马来西亚手机号 PII 正则 | `src/agent/middleware.py:_PHONE_MY` | 课件 §2.3(p23-24)只演示了 11 位数字检测器,马来西亚号段是本地化扩展 |
 | Chroma 过渡后端 | `src/kb.py:_build_chroma` | 课件用 Milvus;Chroma 仅作为 Milvus 未就绪时的过渡,由 `KB_BACKEND` 一行切换 |
-| SQLite 记忆后端 | `src/agent/memory.py` | 课件 §2.2(p14-18)实操的是 PostgresSaver;SQLite 是本地快速验证的替代,部署仍走 PG |
+| SQLite 记忆后端 | `src/agent/memory.py` | 课件 §2.2(p14-18)实操的是 PostgresSaver;本机运行可选 PostgreSQL 或 SQLite |
 
 **口径说明(LangSmith 的评估)**:
 课件把"评估"放在 LangSmith 的 Datasets & Experiments 与 Evaluators(ch03 §1.2 p1-2)。
@@ -172,7 +171,7 @@
 
 | 项 | 现状 | 计划 |
 |---|---|---|
-| 向量库 Milvus | 本机 Docker 已运行，106 个片段可检索 | ✅ M5 的 10/10 检索抽查通过；上线需重建目标环境索引 |
+| 向量库 Milvus | 本机 Docker 已运行，106 个片段可检索 | ✅ 历史 M5 的 10/10 检索抽查通过；更新资料或 Embedding 后重新建库验证 |
 | 记忆后端 PostgreSQL | 本机已验证 `PostgresSaver`/`PostgresStore` | ✅ M4 与 Web 集成测试通过；SQLite 保留为本地替代 |
 | 工具数量 9 个 | 课件 §4.1(p21)建议 2-5 个 | 已提供 `tools_for(...)` 按场景裁剪；可再考虑动态筛选 |
 | 工具调用路由稳定性 | 中间件钩子使单次工具调用可能占用 26-35 个 super-step | 已加 `recursion_limit` 与两个 CallLimit 中间件；最近一次自建评估路由 **27/27**、综合 **32/32**，但模型行为仍有非确定性，不能等同真实用户准确率 |

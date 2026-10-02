@@ -38,8 +38,8 @@ context_schema)· Milvus 向量库 + 云端 bge-m3 Embedding · SQLite / Postgre
    长期画像(Store 按 user_id 隔离);用户身份经 **`context_schema` + `ToolRuntime`**
    显式注入,并拒绝空身份 —— 修掉了旧实现里 `"default"` 兜底造成的跨用户画像泄漏路径;
    最近一次 32 项自建评估全部通过,PII 红线零回显
-5. **服务化**:FastAPI + SSE 流式接口 + 零依赖 Web 聊天页;
-   Docker Compose(app + PostgreSQL + Milvus,记忆/向量库后端均可环境变量切换);
+5. **本机 Web 应用**:FastAPI + SSE 流式接口 + 无独立构建步骤的 Web 聊天页;
+   本机 PostgreSQL / Milvus，或 SQLite / Chroma，后端均可环境变量切换;
    可选 LangSmith 追踪(带 run_name/tags/metadata；涉及真实用户时默认应关闭)
 
 ## 面试常问 & 你的答法
@@ -51,7 +51,7 @@ context_schema)· Milvus 向量库 + 云端 bge-m3 Embedding · SQLite / Postgre
   现在两边接口同构,`.env` 一个 `KB_BACKEND` 开关切换,建库与检索共用同一份配置。
 - *为什么 Embedding 用云端而不是本地?* 课件第10章 §2.4.2(p48-49)用的是
   CloseAI / 硅基流动的 OpenAI 兼容网关,全章没有用 Ollama。
-  本地 Ollama 只保留给"验证模型降级"这一条路径;云服务器上容器回连开发机是坏设计。
+  本地 Ollama 保留给验证模型降级的路径；项目当前仅在本机运行。
 - *最大的坑?* 有三个值得一提:
   ① 给 `@tool` 传了 `args_schema` 之后,langchain 会拿 **Pydantic 类的 docstring**
   当工具描述、把函数自己的 docstring 忽略掉 —— 表现是模型看到的工具说明变成了
@@ -72,5 +72,5 @@ context_schema)· Milvus 向量库 + 云端 bge-m3 Embedding · SQLite / Postgre
 官方文档 RAG 知识库(Milvus + 云端 Embedding,回答附出处);实现 PII 脱敏、长对话压缩、
 上下文清理、调用限额、模型降级、敏感操作人工确认等中间件治理与全链路审计;
 多用户持久化记忆(会话隔离 + 用户画像,身份经 context_schema 显式注入);
-FastAPI/SSE 流式服务 + Docker 部署方案;最近一次 32 项自建评估 32/32,
+FastAPI/SSE 本机 Web 应用;最近一次 32 项自建评估 32/32,
 RAG 检索抽查 10/10 命中。

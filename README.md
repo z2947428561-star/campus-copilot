@@ -6,7 +6,9 @@
 
 面向校园信息查询的 AI 助手：用 RAG 检索教务政策，用结构化工具查询课程、校历和教室，并根据登录用户录入的成绩计算 GPA。基于 LangChain / LangGraph、FastAPI 和原生 Web 界面构建。
 
-**当前定位：可在本机运行的学习与工程实践项目。** 以厦门大学马来西亚分校（XMUM）场景为例，非学校官方服务；尚未接入学校教务账号或实时选课系统，也没有公开演示站点。
+**当前目标：仅在本机运行和验证。** 浏览器通过 `127.0.0.1:8000` 访问，应用在本机 Python 环境运行；仓库暂不提供服务器部署、域名或 HTTPS 反向代理方案。以厦门大学马来西亚分校（XMUM）场景为例，非学校官方服务，尚未接入学校教务账号或实时选课系统。
+
+本机运行不等于完全离线：默认对话模型和 Embedding 仍调用外部 API。已有本机 PostgreSQL / Milvus 可以继续使用；轻量路径可选 SQLite / Chroma。
 
 [快速开始](#快速开始) · [架构与代码阅读指南](docs/architecture.md) · [本地开发](docs/local-development.md) · [评估报告](docs/eval-results.md) · [贡献指南](CONTRIBUTING.md)
 
@@ -47,7 +49,7 @@ flowchart LR
 
 ## 快速开始
 
-以下是**新克隆仓库**的轻量本地路径，使用 SQLite + Chroma，无需先启动 PostgreSQL 或 Milvus。Python 版本与 Docker 保持 **3.13**；对话与建知识库仍需要各自的模型 API 配置。
+以下是**新克隆仓库**的轻量本地路径，使用 SQLite + Chroma，无需先启动 PostgreSQL 或 Milvus。使用 **Python 3.13**；对话与建知识库仍需要各自的模型 API 配置。
 
 ```bash
 git clone https://github.com/z2947428561-star/campus-copilot.git
@@ -100,7 +102,7 @@ python -m uvicorn src.server:app --host 127.0.0.1 --port 8000
 python scripts/check_offline.py
 ```
 
-GitHub Actions 运行相同的离线检查，覆盖账号规则、登录限流、个人数据隔离、API 边界、密码重置、配置预检和 Chroma 重建。它不代表模型问答、真实 PostgreSQL / Milvus 或公网部署已经通过验收。
+GitHub Actions 只做代码检查，不部署应用；运行相同的 6 个离线测试文件，覆盖账号规则、登录限流、个人数据隔离、API 边界、密码重置和 Chroma 重建。它不代表真实模型问答或本机 PostgreSQL / Milvus 已通过集成验证。
 
 [历史评估报告](docs/eval-results.md)记录：**2026-09-26 的 32 道自建题通过 32 道，其中 27 道工具路由断言全部通过**。判定使用关键词规则和实际执行的 ToolMessage；这是一组固定题目的结果，不等于开放问题准确率，也不是本次文档更新重新跑出的数据。
 
@@ -112,7 +114,7 @@ GitHub Actions 运行相同的离线检查，覆盖账号规则、登录限流�
 | --- | --- |
 | [架构与代码阅读指南](docs/architecture.md) | 一次请求如何流转、存储边界、主要文件职责与推荐阅读顺序 |
 | [本地开发](docs/local-development.md) | Windows / Linux 环境、配置、启动、测试与常见问题 |
-| [部署指南](docs/deploy.md) | Docker Compose、PostgreSQL、Milvus、Caddy、备份与上线检查 |
+| [本机基础设施](ops/README.md) | 已有 PostgreSQL / Milvus 的本机端口绑定与数据保留注意事项 |
 | [数据说明](docs/data-plan.md) | 公开文档快照、演示种子数据及尚未接入的真实数据 |
 | [评估记录](docs/eval-results.md) | 固定测试集的历史结果与评估口径 |
 | [课程对照](docs/course-map.md) | 尚硅谷 LangChain 课程学习内容与代码落点 |
@@ -120,11 +122,11 @@ GitHub Actions 运行相同的离线检查，覆盖账号规则、登录限流�
 
 ## 当前边界与后续工作
 
-- 目前以本机单实例运行为目标；域名、云服务器容量、并发和公网安全配置仍需独立验收。
+- 仅支持本机单实例使用；启动时绑定 `127.0.0.1`，不将应用或数据库端口对外开放。
 - 课程、教室和排课包含演示数据；个人成绩由用户录入，未连接学校系统。学期仍有固定配置。
 - 政策知识库是人工整理的离线快照，尚未自动同步，也未完整记录采集日期。
 - 登录限流在单进程内生效；浏览器 token 使用 localStorage。注册仅校验用户名格式，不证明学生身份。
 - 模型和 Embedding 服务会接收相关请求内容；LangSmith 默认关闭，PII 规则也不能保证覆盖所有个人信息。
-- 后续重点：真实数据更新流程、多学期支持、更充分的检索评估、并发验证与依赖锁定。
+- 后续重点：本机启动与恢复体验、真实数据更新流程、多学期支持、检索评估、多标签页请求处理与依赖锁定。
 
 欢迎通过 [Issues](https://github.com/z2947428561-star/campus-copilot/issues) 反馈可复现问题，提交改动前请阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。仓库暂未指定许可证。

@@ -52,7 +52,7 @@ def on_decide(info) -> list:
 
 def main():
     # local_ollama=True:本文件就是"验证降级"的地方,备胎指向本机 Ollama
-    # (第08章 §3.3 p53)。云上请用默认值 False,走云端备胎。
+    # (第08章 §3.3 p53)。其他入口可按配置选择独立来源的备用模型。
     agent = get_agent(with_middleware=True, local_ollama=True)
     cfg = make_config(thread_id=default_thread_id(USER_ID), user_id=USER_ID)
 

@@ -1,8 +1,11 @@
 # 本机数据库端口
 
 2026-09-27 已将独立 PostgreSQL、Milvus、MinIO 的宿主机端口限制到
-`127.0.0.1`。这是本机开发环境的运行配置，不是项目根目录的生产
-`docker-compose.yml`。
+`127.0.0.1`。本目录保留已有本机数据库的端口约束；项目根目录的应用
+镜像、整套 Compose 和 HTTPS 代理已移除。应用直接在本机 Python 环境运行。
+
+以下容器名和 WSL 路径是现有开发机的记录，不是新克隆用户必须照搬的配置。
+新环境可以先使用 README 中的 SQLite + Chroma 路径，不必安装数据库容器。
 
 - PostgreSQL：现用容器 `postgres` 挂载原命名卷 `pgdata`，监听
   `127.0.0.1:5432`。原容器停用并保留为 `postgres-before-local-bind`，

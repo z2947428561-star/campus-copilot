@@ -167,7 +167,7 @@ def build():
             "\n[失败] 向量库不可用。请检查:\n"
             "  - .env 的 EMBED_API_KEY 是否已配置\n"
             f"  - KB_BACKEND={config.KB_BACKEND} 对应的服务是否已启动\n"
-            f"    (milvus 需要 Docker/WSL2:docker compose up -d,URI={config.MILVUS_URI})"
+            f"    (请启动配置的本机 Milvus，或选择 KB_BACKEND=chroma；URI={config.MILVUS_URI})"
         )
         sys.exit(1)
 

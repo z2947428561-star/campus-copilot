@@ -76,7 +76,7 @@ def get_agent(
            空教室/政策问答等所有最终答案都会被强制套进同一结构。
            只有做"专用报表 Agent"时才该用。
     local_ollama:
-        降级备胎是否指向本机 Ollama(仅本地验证降级用;云上应保持 False)
+        是否显式使用本机 Ollama 验证降级；False 时读取配置的备用模型。
     """
     if with_memory:
         checkpointer = get_checkpointer()

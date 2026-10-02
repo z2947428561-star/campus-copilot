@@ -1,6 +1,6 @@
 # 架构与代码阅读指南
 
-本文对应当前仓库实现。Campus Copilot 是一个模块化 Python 单体应用：FastAPI 提供同源 Web 页面和 API，LangChain Agent 根据问题调用工具，LangGraph 保存会话与中断现场。CLI 和 Web 共用 Agent 的组装与流式处理代码。
+本文对应当前仓库实现，目标仅为本机运行。Campus Copilot 是一个模块化 Python 单体应用：本机 FastAPI 提供同源 Web 页面和 API，LangChain Agent 根据问题调用工具，LangGraph 保存会话与中断现场。CLI 和 Web 共用 Agent 的组装与流式处理代码。`src/server.py` 是本机 Web 必需的后端，不是独立的服务器部署方案。
 
 ## 一次聊天请求怎么走
 
@@ -94,12 +94,10 @@ SSE 事件类型包括 `token`、`interrupt`、`done`、`error`。恢复请求�
 | `scripts/build_kb.py` | 解析政策快照、切分并写入向量库 |
 | `scripts/test_auth_*.py`、`test_reset_local_password.py` | 注册、登录、限流、旧账号兼容和重置验证 |
 | `scripts/test_student_data.py`、`test_server_security.py` | 用户隔离、GPA 数据来源、API 边界和页面缓存策略 |
-| `scripts/test_chroma_rebuild.py`、`test_preflight.py` | 本地向量重建和发布配置检查 |
+| `scripts/test_chroma_rebuild.py` | 本地向量重建检查 |
 | `scripts/test_m3.py`、`test_m4.py`、`test_m5.py`、`test_server.py` | 需要模型、数据库或运行中 HTTP 服务的集成验证 |
 | `scripts/eval_m6.py`、`eval_set.json` | 真实模型跑批与固定题目的规则断言 |
-| `scripts/preflight.py`、`backup_postgres.sh` | 发布配置预检与 PostgreSQL 备份 |
 | `scripts/reset_local_password.py` | 本机维护入口：交互重置已有账号密码并撤销旧 token |
-| `Dockerfile`、`docker-compose.yml`、`Caddyfile` | 镜像、服务编排与可选 HTTPS 反向代理 |
 | `ops/` | 本机基础设施调整说明与辅助文件 |
 | `.github/` | 自动检查、Issue 表单和 PR 模板 |
 | `docs/` | 当前使用说明、架构说明及历史开发/评估记录 |
@@ -113,10 +111,10 @@ SSE 事件类型包括 `token`、`interrupt`、`done`、`error`。恢复请求�
 后续应优先处理以下边界，再考虑拆服务：
 
 1. **配置和测试隔离**：模块导入时读取配置，容易让同一进程的测试共享状态。离线检查现在逐文件启动新进程，并在临时项目副本中运行。
-2. **多会话与并发**：Web 默认每个用户一个固定主会话，Agent 和记忆连接按进程缓存。多标签页并发、请求取消和多实例部署需要专项验证。
+2. **多会话与并发**：Web 默认每个用户一个固定主会话，Agent 和记忆连接按进程缓存。本机多标签页并发和请求取消需要专项验证；当前不考虑多实例运行。
 3. **数据与时间范围**：学期和种子数据存在固定范围。多学期支持、政策版本和更新时间，比增加工具数量更直接影响可用性。
 4. **前端维护**：HTML、CSS 和 JavaScript 目前放在单文件中。页面继续扩展时可按模块拆分，但现阶段无需引入独立前端服务。
-5. **身份与运行边界**：用户名格式不代表学校身份认证；登录限流只在进程内生效。公开服务前需要重新评估身份验证、共享限流和 token 存储。
+5. **身份与运行边界**：用户名格式不代表学校身份认证；登录限流只在进程内生效。只监听本机回环地址，仍需保护 token、数据库和含个人内容的日志。
 6. **可复现性**：部分依赖只有最低版本约束；当前 Python 3.13 路径有检查，尚未提供完整跨平台依赖锁文件。
 
 中间件能力也有开关：上下文编辑默认关闭，模型降级仅在可用备用模型已配置时启用。不要把“代码中有实现”理解成“每次请求都启用”。

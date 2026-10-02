@@ -167,8 +167,8 @@ KB_TOP_K = _env_int("KB_TOP_K", 5)
 # 课件 §2.2(p14-18)实操的是 PostgresSaver,故 postgres 是主路径;
 # sqlite 留给"本地快速验证 / 无 PG 环境"(§2.1.3 p11 也把它列为合法选项)。
 MEMORY_BACKEND = _env("MEMORY_BACKEND", "postgres")     # postgres | sqlite
-# postgres 时必填。本机开发用的默认值与 docker-compose.yml 里的 postgres 服务保持一致,
-# 避免"compose 能跑、本机跑不了"的两套配置。
+# 本机 PostgreSQL 连接串；已有环境应在 .env 中显式配置自己的账号和数据库。
+# 下方仅为历史开发默认值，不会创建数据库或迁移已有账号。
 DATABASE_URL = _env(
     "DATABASE_URL", "postgresql://campus:campus_pw@127.0.0.1:5432/campus"
 )

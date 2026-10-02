@@ -3,6 +3,8 @@
 > 顺序 = 课程章节顺序,学到哪做到哪。每个里程碑有验收标准(DoD),全勾完才算完成。
 > 状态:未开始 / 进行中 / 完成
 
+> 当前范围（2026-10-02）：仅保证本机运行。服务器部署、HTTPS 代理与上线任务已移出当前计划；旧提交可用于追溯已移除的实现。本文件早期日志是历史记录，不代表当前待办。
+
 ---
 
 ## ⚠️ 本文件的修订说明(2026 改造)
@@ -209,19 +211,14 @@ Milvus Lite 不支持 Windows —— 这是当初改用 Chroma 的原因。现�
 命中《重修规定与费用》原文段落并给出官方 PDF 出处 ✓;10 问抽查 10/10 ✓;
 doc_type 元数据过滤生效 ✓。
 
-## M6 部署与收官(课件未覆盖此主题 + 少量超纲)- ◐ 本地验证完成，云部署待办(2026-09-26)
+## M6 本机 Web 与评估收官 - 本地验证记录（2026-09-26，范围更新于 2026-10-02）
 
-> 说明:课件**没有"部署"章节**。全课程与部署相关的只有三处概念性提及:
-> ch01 p4(LangServe 历史)、ch02 §4 p19(Ollama 本地部署)、ch03 p2(LangSmith Deployments)。
-> FastAPI / SSE / Docker Compose 全课程无教学,故本里程碑整体属**超纲自主决策**,
+> FastAPI / SSE 全课程无教学，本机 Web 入口属**超纲自主决策**，
 > 详见 `docs/course-map.md` §二。
 
 - [x] FastAPI:对话接口 + SSE 流式 + session 管理(src/server.py;
       thread_id 会话隔离,HITL 中断跨 HTTP 请求恢复,`scripts/test_server.py` 集成测试通过)
 - [x] 简单 Web 页面(src/static/index.html,零依赖手写:流式渲染/确认条/多用户入口)
-- [x] Docker Compose:app + PostgreSQL + Milvus(Dockerfile/compose/.dockerignore 已写,
-      WSL Docker 中已构建镜像；Milvus 路径通过 M5 验证，低配 Chroma 路径已在
-      独立 app + PostgreSQL + Caddy 栈验证 HTTPS 探活与数据卷挂载)
 - [x] 自建评估集现有 32 问答对,记录准确率(scripts/eval_set.json + eval_m6.py)
       ⚠️ 口径:这是**自建跑批 + 关键词断言**(规则评估器雏形),
       **未使用** LangSmith 的 Datasets/Evaluators(课件 ch03 §1.2 p1-2 的那条路);
@@ -233,28 +230,26 @@ doc_type 元数据过滤生效 ✓。
       剩余 2 题失败(w04 只调了 get_academic_week、g02 未调 calculate_gpa)
       均为**工具路由未触发**,属 LLM 非确定性(同一评估集两遍失败集合不同)
 - [x] **最新回归:32/32、工具路由 27/27**(2026-09-26；自建关键词断言，非真实用户验收)
-- [x] 登录尝试限流、Chroma 持久化卷、PostgreSQL 备份/隔离恢复演练
-- [x] 发布前预检、健康检查、请求长度限制与异常脱敏；独立容器完成 HTTPS、
-      106 片段构建/重启持久化、SSE/HITL、10 条成绩非空备份恢复演练(2026-09-26)
+- [x] 登录尝试限流、本机健康检查、请求长度限制与异常脱敏
+- [x] 本机 PostgreSQL / Milvus 连接、记忆持久化、SSE/HITL 验证
 - [x] README 完工:映射表改为可核验的章节锚点 + 运行指南 + 评估数字
 - [x] 简历段落回填真实数字(docs/resume.md)
-- [ ] **部署云服务器,同学可用(需要用户操作 → 见下方"部署前置清单")**
-- [ ] 发链接收集同学反馈(依赖上一步)
+- [ ] 完善本机启动与故障恢复体验
+- [ ] 多学期数据支持、政策更新时间和本机多标签页请求验证
 
 **实现文件**:`src/server.py`、`src/static/index.html`、`run_web.cmd`、
 `scripts/test_server.py`、`scripts/eval_set.json`、`scripts/eval_m6.py`、
-`docs/eval-results.md`、`docs/resume.md`、`Dockerfile`、`docker-compose.yml`。
+`docs/eval-results.md`、`docs/resume.md`。
 
-**🔁 部署前置清单(按课件回正后新增的阻塞项)**:
+**本机依赖与验证记录**:
 | # | 事项 | 状态 |
 |---|---|---|
-| 1 | `requirements.txt` 补齐 fastapi / uvicorn / pymilvus / psycopg | ✅ 第一批已补(原先全写在注释里,镜像内 pip install 成功但没有 uvicorn) |
-| 2 | `.dockerignore` 放行知识库目录 | ✅ 第一批已修(原先排除 `data/chroma_db/` 而 Dockerfile 又 COPY `data/`,RAG 在镜像里是空的) |
-| 3 | 硬编码 `localhost:11434` 改为读 `OLLAMA_HOST` | ✅ 第一批已改;且 embedding 与降级备胎都不再依赖本机 Ollama |
-| 4 | LangSmith 四变量补 `LANGSMITH_ENDPOINT`;云上默认关 tracing | ✅ 第一批已补(`.env.example` / compose) |
-| 5 | **本地起 Docker + WSL2 → 拉 Milvus → 重建知识库** | ✅ Docker/WSL/Milvus 已找到并通过 M5 检索与引用测试 |
-| 6 | **本地 PostgreSQL → 验证 `MEMORY_BACKEND=postgres` 路径** | ✅ M4 及 Web HTTP 集成测试通过；独立 Compose PostgreSQL 也完成备份恢复演练 |
-| 7 | 公开访问前加鉴权 | ✅ 2026-09-19 完成:`src/auth.py`(注册/登录/Bearer token,密码 pbkdf2+盐,token 只存哈希),`/api/chat` 的 user_id 从 token 解析,请求体身份字段已删除;`test_server.py` 新增 5 条鉴权用例 |
+| 1 | Python 依赖 | ✅ 已包含 fastapi / uvicorn / pymilvus / psycopg |
+| 2 | 可选本机模型 | ✅ 通过 `OLLAMA_HOST` 配置；不作为 Embedding 的必需依赖 |
+| 3 | 可选追踪 | ✅ LangSmith 四变量齐全，默认关闭 tracing |
+| 4 | 本机 Milvus | ✅ 历史 M5 检索与引用测试通过 |
+| 5 | 本机 PostgreSQL | ✅ 历史 M4 及 Web HTTP 集成测试通过 |
+| 6 | 本机账号隔离 | ✅ 注册/登录/Bearer token，密码加盐哈希，身份由 token 解析 |
 
 **M6 踩坑记录(面试素材)**:
 1. uvicorn `src.server:app` 只把项目根放进 sys.path,`agent` 等兄弟包解析不到

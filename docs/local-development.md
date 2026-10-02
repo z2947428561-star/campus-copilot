@@ -2,7 +2,7 @@
 
 ## 环境与首次启动
 
-使用 Python 3.13（与 Docker 镜像一致），从项目根目录运行命令。首先参考 [README 快速开始](../README.md#快速开始)创建环境并复制 `.env.example`。
+使用 Python 3.13，从项目根目录运行命令。首先参考 [README 快速开始](../README.md#快速开始)创建环境并复制 `.env.example`。应用只在本机 Python 环境运行；Docker 仅在使用容器化本机数据库时需要。
 
 | 环境 | Python 路径 | 说明 |
 | --- | --- | --- |
@@ -41,7 +41,7 @@ MILVUS_URI=http://127.0.0.1:19530
 
 数据库需要先存在，账号/个人数据表在应用启动时创建，Agent 记忆表按需初始化。URL 中凭据需按连接字符串规则编码；不要把真实连接串复制到 Issue。
 
-仓库 Compose 中的 PostgreSQL、Milvus 仅对 Compose 网络开放，宿主机 Python 不能直接通过上述端口访问它们。使用 Compose 时应用也应在容器内运行；详细步骤见[部署指南](deploy.md)。
+连接已有本机 PostgreSQL / Milvus 即可，不需要重新创建应用容器。容器化数据库的端口应仅映射到 `127.0.0.1`；已有环境的绑定说明见[本机基础设施](../ops/README.md)。`ops/milvus-local-ports.yml` 是已有 Milvus 编排的覆盖文件，不是独立启动配置。项目不再提供根目录的整套应用 Compose 编排。
 
 改变 `MEMORY_BACKEND` / `DATABASE_URL` 不会自动迁移用户，更换 Embedding 模型后应重新建索引。请保持建库与查询的模型、维度和存储配置一致。
 
@@ -68,9 +68,9 @@ python -m uvicorn src.server:app --host 127.0.0.1 --port 8000
 python scripts/check_offline.py
 ```
 
-该命令只复制 `src/`、`scripts/` 和公开种子/政策文件到临时目录，不复制 `.env`、个人数据库或向量目录。先在副本中建公共种子库，再以独立进程运行七个离线测试文件，结束后清理临时目录。依赖需事先安装。
+该命令只复制 `src/`、`scripts/` 和公开种子/政策文件到临时目录，不复制 `.env`、个人数据库或向量目录。先在副本中建公共种子库，再以独立进程运行六个离线测试文件，结束后清理临时目录。依赖需事先安装。
 
-它覆盖账号规则、登录限流、个人数据隔离、API 错误边界、密码重置、部署配置预检和 Chroma 重建。不会调用模型 API，也不需要 PostgreSQL / Milvus 服务。
+它覆盖账号规则、登录限流、个人数据隔离、API 错误边界、密码重置和 Chroma 重建。不会调用模型 API，也不需要 PostgreSQL / Milvus 服务。GitHub Actions 仅运行这些代码检查，不执行部署。
 
 ### 真实服务集成验证
 

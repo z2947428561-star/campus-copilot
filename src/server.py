@@ -1,17 +1,18 @@
-"""FastAPI 服务 —— Campus Copilot 的 Web 化与部署形态。
+"""本机 FastAPI 后端 —— 为 Campus Copilot 的 Web 界面提供同源 API。
 
 接口设计:
 - GET  /            → 聊天页面(static/index.html)
-- GET  /api/health  → 健康检查(部署探活用)
+- GET  /api/health  → 本机进程健康检查
 - POST /api/chat    → SSE 流式对话,事件类型:
     token      正常输出的文本增量
     interrupt  HITL 高危工具确认(流到此为止,等用户决定)
     done       本轮结束
     error      本轮出错
 - 请求体:
-    {"user_id": ..., "message": "..."}            发新消息
-    {"user_id": ..., "resume": true}              放行上次中断(单个动作)
-    {"user_id": ..., "decisions": [{...}, ...]}   完整决策列表(多动作 / edit)
+    {"message": "..."}            发新消息
+    {"resume": true}              放行上次中断(单个动作)
+    {"decisions": [{...}, ...]}   完整决策列表(多动作 / edit)
+    身份由 Authorization: Bearer token 解析，不从请求体读取。
 
 会话与 HITL 的 Web 化思路(与 CLI 的差异):
 - CLI:input() 阻塞等确认;Web:SSE 流在 interrupt 处断开,
