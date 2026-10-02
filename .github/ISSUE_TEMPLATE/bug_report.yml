@@ -1,0 +1,31 @@
+name: Bug 反馈
+description: 报告可复现的运行问题
+body:
+  - type: markdown
+    attributes:
+      value: 请移除日志或截图中的密码、API key、token、真实账号和个人成绩。
+  - type: textarea
+    id: environment
+    attributes:
+      label: 运行环境
+      description: 系统、Python 版本、提交版本、存储后端及启动方式。
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 复现步骤
+      description: 从启动命令或打开页面开始，写出最小复现步骤。
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: 预期与实际结果
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 脱敏日志或截图
+      description: 仅附与问题相关的内容。

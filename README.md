@@ -1,159 +1,130 @@
-﻿# Campus Copilot — 校园智能助手
+# Campus Copilot · 校园智能助手
 
-> 面向大学生的校园生活智能体:教务政策问答(RAG)+ 课表/校历/成绩等结构化查询(Tools)+ 个性化记忆。
-> 兼作尚硅谷 LangChain 课程(BV1rv7A6oEeP)的毕业项目 —— 课件 **10 章 565 页**逐章有落点,
-> 形成可核验的"学完证据链",见 **`docs/course-map.md`**。
+[![Offline checks](https://github.com/z2947428561-star/campus-copilot/actions/workflows/ci.yml/badge.svg)](https://github.com/z2947428561-star/campus-copilot/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)
+![Status](https://img.shields.io/badge/status-local%20prototype-407878)
 
-## 项目定位
+面向校园信息查询的 AI 助手：用 RAG 检索教务政策，用结构化工具查询课程、校历和教室，并根据登录用户录入的成绩计算 GPA。基于 LangChain / LangGraph、FastAPI 和原生 Web 界面构建。
 
-一句话:**把散落在教务处网站、通知公告、培养方案里的信息,变成一个能对话的助手。**
+**当前定位：可在本机运行的学习与工程实践项目。** 以厦门大学马来西亚分校（XMUM）场景为例，非学校官方服务；尚未接入学校教务账号或实时选课系统，也没有公开演示站点。
 
-它不是玩具的理由:
-1. **双数据源**:非结构化文档(RAG,Milvus 向量检索)+ 结构化数据库(SQLite)—— 两套检索范式在一个 Agent 里协同
-2. **多用户场景**:部署后同学真的能用,有真实反馈迭代(会话隔离、个性化画像因此不是摆设)
-3. **完整工程链路**:中间件治理(7 个内置中间件 + Hook 审计)+ LangSmith 全链路追踪 + Docker 部署 —— 面试官问"生产化考虑"有得答
+[快速开始](#快速开始) · [架构与代码阅读指南](docs/architecture.md) · [本地开发](docs/local-development.md) · [评估报告](docs/eval-results.md) · [贡献指南](CONTRIBUTING.md)
 
-## 用户故事
+![Campus Copilot 登录界面，无账号信息](docs/images/login.png)
 
-| # | 场景 | 背后技术 |
-|---|---|---|
-| 1 | 「挂科了怎么补考?重修和补考有什么区别?」 | RAG 检索教务规定文档 |
-| 2 | 「大二下能修大数据导论吗?先修课是什么?」 | RAG(培养方案)+ 工具(课程库查询) |
-| 3 | 「这学期第 10 周是几号?还剩几周放假?」 | 工具:校历/教学周计算 |
-| 4 | 「帮我算算这学期 GPA,哪门课拉分了」 | 工具:成绩计算 + Pydantic 结构化输出报告 |
-| 5 | 「明天上午哪栋楼有空教室?」 | 工具:空教室查询(结构化数据) |
-| 6 | 「我大三了,帮我规划下还差的学分」 | 长期记忆(培养进度画像)+ Agent 规划 |
+## 能做什么
 
-## 课程模块 → 项目落点(证据链)
+| 能力 | 示例 | 数据与边界 |
+| --- | --- | --- |
+| 政策问答 | “重修要交钱吗？” | 检索人工整理的政策快照，返回来源；以学校最新原文为准 |
+| 校历查询 | “2026 年 10 月 5 日是第几教学周？” | 版本化校历种子数据，目前覆盖 2026 年九月学期 |
+| 课程与教室查询 | “CS101 有什么先修课？”“周三 10 点哪有空教室？” | 公共课程目录和演示排课，非实时教务数据 |
+| 个人课程与成绩 | 在“个人数据”中录入课程、成绩，再查询个人课表或 GPA | 按登录用户隔离；新账号不会自动获得演示成绩 |
+| GPA 分析确认 | “帮我算一下这学期 GPA” | 计算前展示确认操作，网页支持批准或拒绝 |
+| 持久化记忆 | “记住我是大一学生” | 会话状态与长期画像分别保存，按用户隔离 |
 
-> 完整映射见 **`docs/course-map.md`**(逐章逐节,含页码锚点与"课件未覆盖"清单)。
-> 下表只给主线条目;引用格式统一为 `第0X章 §X.Y(pN)`,
-> 页码锚点取自课件 PDF 页脚 —— 课件共 **10 章 565 页**。
-
-| 课程章节(课件锚点) | 落点 | 状态 |
-|---|---|---|
-| 第02章 模型的创建与调用 §2.2/§3/§3.3(p8、p11-16) | `src/model.py` + `src/config.py`:`init_chat_model` 统一入口、temperature/timeout/max_retries | ✅ |
-| 第03章 LangSmith §2.3(p6)、§3(p7-8) | `src/agent/runtime.py`:四个环境变量 + run_name/tags/metadata | ✅ |
-| 第04章 消息与提示词模板 §1.6(p16-19)、§2.4(p37-42) | `src/prompts/`(模板库 + 按阶段组装)、`src/messages.py` | ✅ |
-| 第05章 Tools §3.1(p15-18)、§3.3(p20-27)、§6.4(p43) | `src/tools/*.py` 9 个工具:`parse_docstring` + `args_schema` + 返回 JSON 字符串 | ✅ |
-| 第06章 结构化输出 §2.1(p2-16) | `src/tools/gpa.py` 的 Pydantic 数据契约(含 `Field(description)` 与范围约束) | ✅ |
-| 第07章 智能体 §1.4(p2-4)、§5(p26-28)、§8(p68-76)、§9.3(p80-81) | `src/agent/assistant.py`、`src/agent/streaming.py` | ✅ |
-| 第08章 中间件 §2.1-2.3(p7-24)、§3.1-3.3(p34-53)、§3.8(p73)、§5.4(p99-111) | `src/agent/middleware.py`:7 个内置中间件 + 2 个 wrap Hook | ✅ |
-| 第09章 上下文与记忆 §2.1(p6-13)、§3(p39-52)、§4.2(p74-80) | `src/agent/memory.py`、`src/tools/profile.py`、`src/context.py` | ✅ PostgreSQL 主路径,SQLite 备用 |
-| 第10章 RAG §2.3(p24-46)、§2.4(p46-49)、§2.5(p51-65) | `scripts/build_kb.py`、`src/kb.py`、`src/tools/policy.py` | ✅ Milvus + 云端 embedding |
-| **课件未覆盖(超纲自主决策)** | FastAPI/SSE 服务化、Docker Compose、32 问自建评估集、元数据+全库混合召回 | 见 `docs/course-map.md` §二 |
+Web 支持注册、登录、退出、SSE 流式回答和个人数据管理。当前共有 **9 个 Agent 工具**；主模型默认使用 DeepSeek 的 OpenAI 兼容接口，可配置独立的备用模型和可选 LangSmith 追踪。
 
 ## 架构
 
-```
-用户 ─ Web/FastAPI(SSE 流式)
-        └─ Agent(create_agent + system_prompt + 9 tools + context_schema)
-             ├─ [RAG] 教务文档 → Milvus 向量检索(expr 元数据过滤)+ 云端 Embedding
-             ├─ [DB] SQLite:课表/校历/教室/课程库
-             ├─ 中间件管道:PII 脱敏→摘要压缩→上下文清理→审计→调用限额→模型降级→HITL
-             ├─ Hook:wrap_model_call / wrap_tool_call 审计 + 耗时
-             └─ 记忆:checkpointer(短期会话)+ store(长期画像,按 user_id 隔离)
-        模型:DeepSeek(主)+ 独立备胎(Ollama 或另一个云服务商) · LangSmith 全链路追踪
-```
-
-**依赖说明**:向量库按课件用 **Milvus**(第10章 §2.5.2 p52),Embedding 走
-**云端 OpenAI 兼容网关**(第10章 §2.4.2 p48-49,第10章全程未用 Ollama)。
-Milvus 需要 Docker/WSL2;尚未拉起时可把 `.env` 的 `KB_BACKEND` 设为 `chroma` 过渡。
-本机 Ollama 仅保留给"本地验证模型降级"这一条路径。
-
-## 本地运行(在 cmd 里跑不起来看这里)
-
-项目环境是一个 **conda 环境**(`conda create -p .venv` 创建)。新开的 cmd 里默认的 `python` 是 **conda base**(`E:\developTools`),那里 **没装 langchain**,所以直接 `python src\chat_cli.py` 会报:
-
-```
-ModuleNotFoundError: No module named 'langchain_core'
+```mermaid
+flowchart LR
+    Browser[Web 界面] --> API[FastAPI：鉴权 / 个人数据 / SSE]
+    CLI[命令行入口] --> Agent[LangChain Agent / LangGraph]
+    API --> Agent
+    API --> UserDB[(PostgreSQL / SQLite：账号与个人数据)]
+    Agent --> LLM[对话模型与可选备用模型]
+    Agent --> Tools[9 个工具]
+    Tools --> Catalog[(SQLite：课程 / 校历 / 演示排课)]
+    Tools --> UserDB
+    Tools --> RAG[政策检索 + Embedding]
+    RAG --> Vector[(Milvus / Chroma)]
+    Agent --> Memory[Checkpointer + Store]
+    Memory --> UserDB
 ```
 
-两种正确启动方式:
+这是一个模块化单体应用。公共结构化数据、个人数据和政策向量分别存储；前端由 FastAPI 同源提供，不需要单独的 Node.js 构建步骤。详见[请求链路、模块职责与阅读顺序](docs/architecture.md)。
 
-**方式一:一键启动(推荐)**
+## 快速开始
 
-```
-run_chat.cmd
-```
+以下是**新克隆仓库**的轻量本地路径，使用 SQLite + Chroma，无需先启动 PostgreSQL 或 Milvus。Python 版本与 Docker 保持 **3.13**；对话与建知识库仍需要各自的模型 API 配置。
 
-双击 `run_chat.cmd` 也行。它内部固定使用项目自己的解释器,不受当前 PATH 和是否 `conda activate` 影响,并且会把 cmd 码页切成 UTF-8(否则中文输入输出会乱码)。
-
-M3 中间件版 Agent(PII 脱敏/长对话压缩/模型降级/GPA 前确认/审计日志):
-
-```
-run_mw.cmd
+```bash
+git clone https://github.com/z2947428561-star/campus-copilot.git
+cd campus-copilot
+python -m venv .venv
 ```
 
-M4 记忆版 Agent(多用户登录/会话落盘重启续聊/长期画像):
+激活环境：
 
-```
-run_mem.cmd
-```
-
-M6 Web 版(浏览器聊天,流式输出 + 敏感操作网页确认):
-
-```
-run_web.cmd
+```powershell
+# Windows PowerShell
+.\.venv\Scripts\Activate.ps1
+Copy-Item .env.example .env
 ```
 
-然后浏览器打开 http://127.0.0.1:8000。
-登录后在右上角「个人数据」录入自己的课程与成绩；GPA 只根据该账号录入的成绩计算。
-课程时间来自演示排课，尚未连接学校选课系统。
-新注册用户名采用「3 位大写专业缩写 + 7 位数字」格式；密码至少 8 位，
-且同时包含字母和数字。旧账号仍可按原凭证登录。
-若本机已有账号忘记密码，可运行 `.\.venv\python.exe scripts\reset_local_password.py`，
-按提示在终端输入用户名和新密码；不会创建账号，重置后旧登录会话失效。
-
-**方式二:手动激活环境**
-
-```
-conda activate "E:\Campus Copilot\.venv"
-python src\chat_cli.py
+```bash
+# macOS / Linux
+source .venv/bin/activate
+cp .env.example .env
 ```
 
-**坑位备忘**
+编辑 `.env`，填入 `DEEPSEEK_API_KEY` 和 `EMBED_API_KEY`，并设置：
 
-| 现象 | 原因 |
-|---|---|
-| `ModuleNotFoundError: No module named 'langchain_core'` | 用的是 conda base 或系统 Python,不是项目环境 |
-| `.venv\Scripts\python` 报「不是内部或外部命令」 | conda 环境的解释器在 **`.venv\python.exe`**,没有 `Scripts\python.exe` |
-| 中文乱码 | cmd 默认码页是 GBK,先用 `chcp 65001`,或直接用 `run_chat.cmd` |
-| PyCharm 里运行报同样的模块错误 | 项目 SDK 目前是 `Python 3.11`(没装依赖),要改成 `E:\Campus Copilot\.venv\python.exe` |
-| `KeyError: 'DEEPSEEK_API_KEY'` | 当前目录下找不到 `.env`,请在项目根目录运行 |
-| 政策类问题回「知识库未接入」 | 知识库还没建:需 Milvus 已启动 + `.env` 配好 `EMBED_API_KEY`,再跑 `scripts/build_kb.py` |
-| 想先跳过 Milvus 试用 | `.env` 设 `KB_BACKEND=chroma` 走本地 Chroma 过渡后端 |
+```dotenv
+MEMORY_BACKEND=sqlite
+KB_BACKEND=chroma
+LANGSMITH_TRACING=false
+LLM_FALLBACK_PROVIDER=none
+```
 
-对话中退出:输入「退出」或 `quit`。
+然后在项目根目录运行：
 
-## 质量与部署
+```bash
+python -m pip install -r requirements.txt
+python scripts/init_db.py
+python scripts/build_kb.py
+python -m uvicorn src.server:app --host 127.0.0.1 --port 8000
+```
 
-- **评估**:2026-09-26 完整重跑 **32/32(100%)**,工具路由 **27/27(100%)**,
-  报告见 `docs/eval-results.md`;
-  评估方法与失败归因记录在 `docs/milestones.md`。
-  口径说明:评估为**自建跑批 + 关键词断言**(规则评估器雏形),
-  **未使用** LangSmith 的 Datasets/Evaluators(课件第03章 §1.2 p1-2 讲的那条路);
-  路由判定以 **ToolMessage 为准**(真的执行过才算命中)
-- **追踪**:LangSmith 全链路 tracing(四个环境变量见 `.env.example`;
-  调用处带 `run_name`/`tags`/`metadata`,可按用户与会话筛选)
-- **简历素材**:`docs/resume.md`(数字均来自实测)
-- **课程对齐**:`docs/course-map.md`(逐章页码锚点 + 课件未覆盖清单)
-- **Docker 部署**:`Dockerfile` + `docker-compose.yml`(app + PostgreSQL + Milvus;
-  production profile 另启 Caddy/HTTPS)。本机已验证 Compose 构建、独立
-  app + PostgreSQL + Chroma + Caddy 启动、本机 HTTPS、SSE/HITL、106 片段持久化及
-  10 条非空成绩的 PostgreSQL 备份恢复；
-  Milvus/Embedding 链路另通过 M5 实测。真实域名证书与云服务器尚未验证，见 `docs/deploy.md`。
+浏览器打开 [http://127.0.0.1:8000/](http://127.0.0.1:8000/)，先注册再登录。用户名为 3 位大写专业缩写 + 7 位数字；密码至少 8 位，同时包含字母和数字。请通过这个地址访问页面。
 
-## 数据策略(本项目的真正难点,先看 docs/data-plan.md)
+`init_db.py` 会重建公共种子库，`build_kb.py` 会重建向量索引；已有数据时先阅读[本地开发说明](docs/local-development.md)。未配置模型和索引时可以查看页面、使用账号功能，但完整对话与政策检索不可用。
 
-- 非结构化:**只采集学校官网公开信息**(学籍管理规定、培养方案、奖学金办法等),爬取即合规
-- 结构化:课表/教室/校历先手工构造模拟数据,格式对齐真实 schema,后续可接真实数据源
-- 详见 `docs/data-plan.md`
+已有 Conda `.venv` 环境的 Windows 用户可继续使用 `run_web.cmd`；它要求解释器位于 `.venv\python.exe`，与标准 venv 的目录布局不同。PostgreSQL / Milvus 的接入方式也见[本地开发说明](docs/local-development.md)。
 
-## 里程碑
+## 检查与评估
 
-M0-M6 按课程章节顺序滚动开发,学到哪做到哪 → `docs/milestones.md`
+```bash
+# 不调用模型 API，使用临时目录和临时数据库
+python scripts/check_offline.py
+```
 
-## 简历预览(项目完工后回填真实数字)
+GitHub Actions 运行相同的离线检查，覆盖账号规则、登录限流、个人数据隔离、API 边界、密码重置、配置预检和 Chroma 重建。它不代表模型问答、真实 PostgreSQL / Milvus 或公网部署已经通过验收。
 
-> 独立开发校园智能助手(基于 LangChain 1.x):双数据源架构 —— 教务文档 RAG(Milvus 向量检索 + 元数据过滤)与结构化课程数据(SQLite)经多工具 Agent 路由协同;PostgreSQL 多用户会话隔离与长期用户画像;中间件治理(长对话摘要/HITL/PII/模型降级);LangSmith 全链路追踪与评估集(N 个问答对,准确率 X%);Docker Compose 部署,服务 N 名同学。
+[历史评估报告](docs/eval-results.md)记录：**2026-09-26 的 32 道自建题通过 32 道，其中 27 道工具路由断言全部通过**。判定使用关键词规则和实际执行的 ToolMessage；这是一组固定题目的结果，不等于开放问题准确率，也不是本次文档更新重新跑出的数据。
+
+真实模型评估会调用外部 API，并写入测试账号、会话或报告；运行前请看[检查分层与隔离要求](docs/local-development.md#测试与评估)。
+
+## 项目导航
+
+| 入口 | 内容 |
+| --- | --- |
+| [架构与代码阅读指南](docs/architecture.md) | 一次请求如何流转、存储边界、主要文件职责与推荐阅读顺序 |
+| [本地开发](docs/local-development.md) | Windows / Linux 环境、配置、启动、测试与常见问题 |
+| [部署指南](docs/deploy.md) | Docker Compose、PostgreSQL、Milvus、Caddy、备份与上线检查 |
+| [数据说明](docs/data-plan.md) | 公开文档快照、演示种子数据及尚未接入的真实数据 |
+| [评估记录](docs/eval-results.md) | 固定测试集的历史结果与评估口径 |
+| [课程对照](docs/course-map.md) | 尚硅谷 LangChain 课程学习内容与代码落点 |
+| [开发里程碑](docs/milestones.md) | 分阶段实现过程与已记录的问题 |
+
+## 当前边界与后续工作
+
+- 目前以本机单实例运行为目标；域名、云服务器容量、并发和公网安全配置仍需独立验收。
+- 课程、教室和排课包含演示数据；个人成绩由用户录入，未连接学校系统。学期仍有固定配置。
+- 政策知识库是人工整理的离线快照，尚未自动同步，也未完整记录采集日期。
+- 登录限流在单进程内生效；浏览器 token 使用 localStorage。注册仅校验用户名格式，不证明学生身份。
+- 模型和 Embedding 服务会接收相关请求内容；LangSmith 默认关闭，PII 规则也不能保证覆盖所有个人信息。
+- 后续重点：真实数据更新流程、多学期支持、更充分的检索评估、并发验证与依赖锁定。
+
+欢迎通过 [Issues](https://github.com/z2947428561-star/campus-copilot/issues) 反馈可复现问题，提交改动前请阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。仓库暂未指定许可证。

@@ -1,0 +1,21 @@
+name: 功能建议
+description: 说明一个希望解决的校园使用场景
+body:
+  - type: textarea
+    id: scenario
+    attributes:
+      label: 使用场景
+      description: 谁会使用，当前遇到什么问题？
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 期望的行为
+    validations:
+      required: true
+  - type: textarea
+    id: data
+    attributes:
+      label: 数据来源与限制
+      description: 如有公开来源请提供链接，不要上传真实个人数据。

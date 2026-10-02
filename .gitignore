@@ -27,3 +27,6 @@ backups/
 .idea/
 .vscode/
 .workbuddy/
+
+# Local browser inspection artifacts
+.playwright-cli/

@@ -47,7 +47,7 @@ curl -fsSL https://get.docker.com | sh
 sudo usermod -aG docker $USER   # 重新登录生效
 
 # 2. 拉代码
-git clone <你的仓库地址> campus-copilot
+git clone https://github.com/z2947428561-star/campus-copilot.git
 cd campus-copilot
 
 # 3. 配环境
@@ -55,7 +55,8 @@ cp .env.example .env
 # 编辑 .env,必填:DEEPSEEK_API_KEY、EMBED_API_KEY、CAMPUS_DOMAIN、POSTGRES_PASSWORD
 # POSTGRES_PASSWORD 使用至少 20 位随机字母数字串，不要包含 URL 特殊字符
 # 云上建议:LANGSMITH_TRACING=false(trace 含同学真实问答,不该默认外传)
-python scripts/preflight.py  # 配置预检；不会打印密钥
+# 如已准备 Python 环境并安装 requirements.txt，可先运行配置预检：
+# python scripts/preflight.py
 ```
 
 ## 三、启动(三条命令)
@@ -98,7 +99,7 @@ Caddy 在 80/443 接入并代理至内部 app。证书签发要求域名解析�
 
 ```bash
 docker compose logs -f app        # 看日志
-docker compose restart app        # 改代码后重启(数据在卷里,不丢)
+docker compose up -d --build app  # 代码更新后重建镜像并重建 app 容器，数据卷保留
 docker compose down               # 停全部(数据保留)
 docker compose down -v            # ⚠️ 连数据卷一起删(慎用)
 bash scripts/backup_postgres.sh     # 备份账号、个人成绩/课程、会话和画像
@@ -127,7 +128,7 @@ docker compose start app
 密码至少 8 位，且同时包含字母和数字。旧账号仍可按原用户名和密码登录，不强制改名或改密。
 公网发布若增加 app 副本，需在可信网关或共享存储增加统一限流；登录被恶意锁定的风险仍需监控。
 
-## 八、本机发布演练记录（2026-09-26）
+## 七、本机发布演练记录（2026-09-26）
 
 - 独立 Compose 项目：app/PostgreSQL healthy，Caddy 本机 HTTPS 探活 200；未登录聊天 401。
 - 容器内从 16 份文档构建 Chroma 106 个片段；重启 app 后仍为 106 个。
@@ -136,10 +137,10 @@ docker compose start app
 - 测试容器、数据卷、含测试账号的备份已清理；原有本地 PostgreSQL/Milvus 保留。
 
 这不是公网验收：真实域名证书、服务器防火墙、学生真实数据与用户反馈仍待部署时检查。
-当前本机 `.env` 配置预检有 3 项未通过：`POSTGRES_PASSWORD`、`CAMPUS_DOMAIN`
+当次本机 `.env` 配置预检有 3 项未通过：`POSTGRES_PASSWORD`、`CAMPUS_DOMAIN`
 和 `LANGSMITH_TRACING=false`。不要把开发机 `.env` 直接复制到公网服务器。
 
-## 七、常见问题
+## 八、常见问题
 
 | 现象 | 原因与处理 |
 |---|---|
