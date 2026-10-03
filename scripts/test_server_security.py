@@ -27,6 +27,15 @@ class ServerSecurityTest(unittest.TestCase):
                     page = client.get("/")
                     self.assertEqual(page.status_code, 200)
                     self.assertEqual(page.headers["cache-control"], "no-store")
+                    self.assertIn('type="module" src="/assets/js/app.js"', page.text)
+                    for asset in ("css/app.css", "js/app.js", "js/api.js", "js/session.js",
+                                  "js/auth.js", "js/chat.js", "js/student-data.js"):
+                        response = client.get("/assets/" + asset)
+                        self.assertEqual(response.status_code, 200, asset)
+                        self.assertEqual(response.headers["cache-control"], "no-store")
+                        self.assertNotIn("text/html", response.headers["content-type"])
+                    self.assertEqual(client.get("/assets/.env").status_code, 404)
+                    self.assertEqual(client.get("/assets/../src/config.py").status_code, 404)
 
                     weak = client.post("/api/register", json={
                         "username": "SEC2509001", "password": "short"

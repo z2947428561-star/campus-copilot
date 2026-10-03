@@ -151,7 +151,7 @@
 
 | 项目内容 | 实现文件 | 说明 |
 |---|---|---|
-| FastAPI + SSE 服务化 | `src/server.py`、`src/static/index.html` | 课件只讲 LangChain/LangGraph,全课程无 Web 服务化与部署章节 |
+| FastAPI + SSE 服务化 | `src/server.py`、`frontend/index.html`、`frontend/js/` | 课件只讲 LangChain/LangGraph,全课程无 Web 服务化与部署章节 |
 | 32 问评估集与自建跑批 | `scripts/eval_set.json`、`scripts/eval_m6.py` | ch03 §1.2(p1-2)讲的是 LangSmith 的 Datasets/Evaluators,本项目未用该平台功能,理由见下 |
 | 元数据过滤 + 全库召回合并 | `src/tools/policy.py` | 自研。课件第10章未涉及 Hybrid Retrieval / EnsembleRetriever / BM25 / MMR / rerank(全部零命中) |
 | 马来西亚手机号 PII 正则 | `src/agent/middleware.py:_PHONE_MY` | 课件 §2.3(p23-24)只演示了 11 位数字检测器,马来西亚号段是本地化扩展 |

@@ -1,7 +1,7 @@
 """本机 FastAPI 后端 —— 为 Campus Copilot 的 Web 界面提供同源 API。
 
 接口设计:
-- GET  /            → 聊天页面(static/index.html)
+- GET  /            → 聊天页面(frontend/index.html)
 - GET  /api/health  → 本机进程健康检查
 - POST /api/chat    → SSE 流式对话,事件类型:
     token      正常输出的文本增量
@@ -48,6 +48,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from langgraph.types import Command
 from pydantic import BaseModel, Field
 
@@ -81,7 +82,8 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title="Campus Copilot", version="1.0.0", lifespan=lifespan)
-STATIC_DIR = Path(__file__).parent / "static"
+FRONTEND_DIR = Path(__file__).resolve().parents[1] / "frontend"
+app.mount("/assets", StaticFiles(directory=FRONTEND_DIR), name="frontend-assets")
 
 
 @app.middleware("http")
@@ -90,7 +92,7 @@ async def security_headers(request, call_next):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"
-    if request.url.path == "/" or request.url.path.startswith("/api/"):
+    if request.url.path == "/" or request.url.path.startswith(("/api/", "/assets/")):
         response.headers["Cache-Control"] = "no-store"
     return response
 
@@ -208,7 +210,7 @@ def _sse(event: dict) -> str:
 
 @app.get("/")
 def index():
-    return FileResponse(STATIC_DIR / "index.html")
+    return FileResponse(FRONTEND_DIR / "index.html")
 
 
 @app.get("/api/health")

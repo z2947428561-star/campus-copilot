@@ -218,7 +218,7 @@ doc_type 元数据过滤生效 ✓。
 
 - [x] FastAPI:对话接口 + SSE 流式 + session 管理(src/server.py;
       thread_id 会话隔离,HITL 中断跨 HTTP 请求恢复,`scripts/test_server.py` 集成测试通过)
-- [x] 简单 Web 页面(src/static/index.html,零依赖手写:流式渲染/确认条/多用户入口)
+- [x] 简单 Web 页面(frontend/index.html,原生 HTML/CSS/JS:流式渲染/确认条/多用户入口)
 - [x] 自建评估集现有 32 问答对,记录准确率(scripts/eval_set.json + eval_m6.py)
       ⚠️ 口径:这是**自建跑批 + 关键词断言**(规则评估器雏形),
       **未使用** LangSmith 的 Datasets/Evaluators(课件 ch03 §1.2 p1-2 的那条路);
@@ -234,10 +234,11 @@ doc_type 元数据过滤生效 ✓。
 - [x] 本机 PostgreSQL / Milvus 连接、记忆持久化、SSE/HITL 验证
 - [x] README 完工:映射表改为可核验的章节锚点 + 运行指南 + 评估数字
 - [x] 简历段落回填真实数字(docs/resume.md)
+- [x] 前端目录与模块拆分（2026-10-03）：独立 HTML/CSS、6 个 ES modules；同源本机启动不变，浏览器回归覆盖账号、个人数据、SSE 与确认/取消
 - [ ] 完善本机启动与故障恢复体验
 - [ ] 多学期数据支持、政策更新时间和本机多标签页请求验证
 
-**实现文件**:`src/server.py`、`src/static/index.html`、`run_web.cmd`、
+**实现文件**:`src/server.py`、`frontend/index.html`、`frontend/css/app.css`、`frontend/js/`、`run_web.cmd`、
 `scripts/test_server.py`、`scripts/eval_set.json`、`scripts/eval_m6.py`、
 `docs/eval-results.md`、`docs/resume.md`。
 

@@ -22,7 +22,7 @@ sequenceDiagram
     Note over UI,Agent: GPA 工具中断时，用户提交决定后以同一 thread_id 恢复
 ```
 
-1. `src/static/index.html` 管理页面、登录状态、个人数据表单与流式事件消费。
+1. `frontend/index.html` 定义页面，`frontend/js/app.js` 绑定事件并协调登录、聊天和个人数据模块；`api.js` 统一发送同源请求与解析 SSE。
 2. `src/server.py` 校验 Bearer token，把服务端确认的身份放进 `UserContext`，再生成用户会话标识。客户端不能自行指定聊天身份。
 3. `src/agent/assistant.py` 组装模型、11 个工具、提示词、中间件、Checkpointer 和 Store；Web 按进程延迟创建并复用 Agent。
 4. `src/agent/streaming.py` 统一处理模型增量、工具结果和人工确认中断。Web 的工作线程把事件送入队列，HTTP 响应边接收边发送。
@@ -55,7 +55,7 @@ SSE 事件类型包括 `token`、`interrupt`、`done`、`error`。恢复请求�
 | 顺序 | 文件 | 重点看什么 |
 | --- | --- | --- |
 | 1 | [`src/server.py`](../src/server.py) | Web 入口、生命周期、依赖鉴权、请求到 Agent 的转换、SSE |
-| 2 | [`src/static/index.html`](../src/static/index.html) | API 如何被调用、token 如何携带、确认操作如何恢复请求 |
+| 2 | [`frontend/index.html`](../frontend/index.html) + [`frontend/js/app.js`](../frontend/js/app.js) | 从页面元素到模块入口，随后按[前端阅读顺序](frontend.md)理解 API、会话和交互 |
 | 3 | [`src/auth.py`](../src/auth.py) | 注册、PBKDF2 密码哈希、token 校验、退出和进程内限流 |
 | 4 | [`src/context.py`](../src/context.py) + [`src/agent/runtime.py`](../src/agent/runtime.py) | 用户身份、thread_id、递归限制和追踪配置的区别 |
 | 5 | [`src/agent/assistant.py`](../src/agent/assistant.py) | Agent 依赖的统一组装点，以及 CLI 各阶段的能力开关 |
@@ -85,6 +85,7 @@ SSE 事件类型包括 `token`、`interrupt`、`done`、`error`。恢复请求�
 
 | 文件或目录 | 职责 |
 | --- | --- |
+| `frontend/index.html`、`frontend/css/app.css`、`frontend/js/` | 页面结构、样式与原生浏览器模块；后端通过 `/assets/` 提供静态资源，模块职责见[前端说明](frontend.md) |
 | `src/prompts/common.py`、`discipline.py`、`system.py`、`__init__.py` | 公共约束、政策引用与行为规则、系统提示词的组合入口 |
 | `src/messages.py` | 消息结构的公共构造方法 |
 | `src/prompt.py`、`src/bootstrap.py` | 早期 CLI 的提示词与启动辅助代码；先理解 Web 主链再回看 |
@@ -97,6 +98,7 @@ SSE 事件类型包括 `token`、`interrupt`、`done`、`error`。恢复请求�
 | `scripts/build_kb.py` | 解析政策快照、切分并写入向量库 |
 | `scripts/test_auth_*.py`、`test_reset_local_password.py` | 注册、登录、限流、旧账号兼容和重置验证 |
 | `scripts/test_student_data.py`、`test_server_security.py` | 用户隔离、GPA 数据来源、API 边界和页面缓存策略 |
+| `scripts/run_frontend_test_app.py`、`test_frontend.js` | 独立临时账号库的本机浏览器回归；真实鉴权/个人数据 API、模拟聊天，不调用模型 |
 | `scripts/test_chroma_rebuild.py` | 本地向量重建检查 |
 | `scripts/test_m3.py`、`test_m4.py`、`test_m5.py`、`test_server.py` | 需要模型、数据库或运行中 HTTP 服务的集成验证 |
 | `scripts/eval_m6.py`、`eval_set.json` | 真实模型跑批与固定题目的规则断言 |
@@ -116,7 +118,7 @@ SSE 事件类型包括 `token`、`interrupt`、`done`、`error`。恢复请求�
 1. **配置和测试隔离**：模块导入时读取配置，容易让同一进程的测试共享状态。离线检查现在逐文件启动新进程，并在临时项目副本中运行。
 2. **多会话与并发**：Web 默认每个用户一个固定主会话，Agent 和记忆连接按进程缓存。本机多标签页并发和请求取消需要专项验证；当前不考虑多实例运行。
 3. **数据与时间范围**：学期和种子数据存在固定范围。多学期支持、政策版本和更新时间，比增加工具数量更直接影响可用性。
-4. **前端维护**：HTML、CSS 和 JavaScript 目前放在单文件中。页面继续扩展时可按模块拆分，但现阶段无需引入独立前端服务。
+4. **前端维护**：HTML、CSS 和 JavaScript 已分离，浏览器代码按 API、会话、鉴权、聊天和个人数据拆成模块，由 `app.js` 协调。无需引入独立前端服务；后续增加交互时同步扩展浏览器回归。
 5. **身份与运行边界**：用户名格式不代表学校身份认证；登录限流只在进程内生效。只监听本机回环地址，仍需保护 token、数据库和含个人内容的日志。
 6. **可复现性**：部分依赖只有最低版本约束；当前 Python 3.13 路径有检查，尚未提供完整跨平台依赖锁文件。
 

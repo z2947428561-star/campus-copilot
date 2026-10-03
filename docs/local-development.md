@@ -68,11 +68,15 @@ python -m uvicorn src.server:app --host 127.0.0.1 --port 8000
 python scripts/check_offline.py
 ```
 
-该命令只复制 `src/`、`scripts/` 和公开种子/政策文件到临时目录，不复制 `.env`、个人数据库、向量目录或 `*.local.json` 私有种子。先在副本中建公共种子库，再以独立进程运行七个离线测试文件，结束后清理临时目录。依赖需事先安装。
+该命令只复制 `src/`、`frontend/`、`scripts/` 和公开种子/政策文件到临时目录，不复制 `.env`、个人数据库、向量目录或 `*.local.json` 私有种子。先在副本中建公共种子库，再以独立进程运行七个离线测试文件，结束后清理临时目录。依赖需事先安装。
 
 它覆盖账号规则、登录限流、个人数据隔离、API 错误边界、密码重置、Chroma 重建和选课经验导入/查询。不会调用模型 API，也不需要 PostgreSQL / Milvus 服务。GitHub Actions 仅运行这些代码检查，不执行部署。
 
 用户提供的选课推荐 Excel 是可选本机数据，导入和更新只使用 `init_db.py --recommendations-only`，见[选课经验说明](course-recommendations.md)。原表、提取的本机种子和数据库均不进入 Git。
+
+### 浏览器回归
+
+页面结构位于 `frontend/`，通过原生 ES modules 加载，不需要构建或打开第二个开发服务。浏览器检查使用独立的 `18765` 端口和临时个人数据库，具体命令见[前端模块说明](frontend.md#浏览器回归)。首页、CSS 和脚本均设置 `Cache-Control: no-store`；修改后刷新页面即可。
 
 ### 真实服务集成验证
 
@@ -92,7 +96,7 @@ python scripts/check_offline.py
 | --- | --- |
 | `ModuleNotFoundError` | 检查 `python` 指向项目环境，再用同一解释器安装依赖 |
 | 登录页网络错误 | 确认访问 `http://127.0.0.1:8000/`，检查服务终端与 `/api/health` |
-| 页面还是旧版 | 刷新标签页；首页响应设置了 `Cache-Control: no-store`，已打开的 DOM 仍需刷新 |
+| 页面还是旧版 | 刷新标签页；首页和 `/assets/` 响应设置了 `Cache-Control: no-store`，已打开的 DOM 仍需刷新 |
 | 用户名或密码错误 | 确认数据库配置未变化、账号已注册、输入正确；忘记密码时见下方本机维护命令 |
 | 登录请求返回 429 | 达到该用户名的进程内限流，等待配置的窗口结束后重试 |
 | 政策检索不可用 | 核对 Embedding 配置、服务额度、向量服务和索引是否已建立 |

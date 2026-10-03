@@ -10,7 +10,7 @@
 
 本机运行不等于完全离线：默认对话模型和 Embedding 仍调用外部 API。已有本机 PostgreSQL / Milvus 可以继续使用；轻量路径可选 SQLite / Chroma。
 
-[快速开始](#快速开始) · [架构与代码阅读指南](docs/architecture.md) · [本地开发](docs/local-development.md) · [评估报告](docs/eval-results.md) · [贡献指南](CONTRIBUTING.md)
+[快速开始](#快速开始) · [架构与代码阅读指南](docs/architecture.md) · [前端模块](docs/frontend.md) · [本地开发](docs/local-development.md) · [评估报告](docs/eval-results.md) · [贡献指南](CONTRIBUTING.md)
 
 ![Campus Copilot 登录界面，无账号信息](docs/images/login.png)
 
@@ -47,7 +47,17 @@ flowchart LR
     Memory --> UserDB
 ```
 
-这是一个模块化单体应用。公共结构化数据、个人数据和政策向量分别存储；前端由 FastAPI 同源提供，不需要单独的 Node.js 构建步骤。详见[请求链路、模块职责与阅读顺序](docs/architecture.md)。
+这是一个模块化单体应用。公共结构化数据、个人数据和政策向量分别存储；前后端代码分目录管理，通过 `/api/` 通信，但本机仍由 FastAPI 同源提供页面和接口，不需要单独的前端服务或 Node.js 构建步骤。详见[请求链路、模块职责与阅读顺序](docs/architecture.md)。
+
+```text
+frontend/      # 原生 HTML / CSS / ES modules；页面和浏览器交互
+src/           # Python 后端：API、Agent、工具、鉴权与存储
+scripts/       # 数据初始化、维护、测试与评估脚本
+data/          # 公开政策与种子；本机私有数据不提交
+docs/          # 使用说明、架构与历史记录
+ops/           # 本机数据库基础设施说明
+.github/       # 离线 CI、Issue 和 PR 模板
+```
 
 ## 快速开始
 
@@ -106,6 +116,8 @@ python scripts/check_offline.py
 
 GitHub Actions 只做代码检查，不部署应用；运行相同的 7 个离线测试文件，覆盖账号规则、登录限流、个人数据隔离、API 边界、密码重置、Chroma 重建及选课经验导入/查询。经验库测试只用虚构样例，不复制本机原始评价。它不代表真实模型问答或本机 PostgreSQL / Milvus 已通过集成验证。
 
+前端另有[浏览器回归测试](docs/frontend.md#浏览器回归)，覆盖账号操作、个人数据增删、SSE 和确认/取消流程；使用临时账号库和模拟聊天，不调用模型，也不访问本机原始评价。此浏览器检查需手动运行，不包含在离线 CI 中。
+
 [历史评估报告](docs/eval-results.md)记录：**2026-09-26 的 32 道自建题通过 32 道，其中 27 道工具路由断言全部通过**。判定使用关键词规则和实际执行的 ToolMessage；这是一组固定题目的结果，不等于开放问题准确率，也不是本次文档更新重新跑出的数据。
 
 真实模型评估会调用外部 API，并写入测试账号、会话或报告；运行前请看[检查分层与隔离要求](docs/local-development.md#测试与评估)。
@@ -115,6 +127,7 @@ GitHub Actions 只做代码检查，不部署应用；运行相同的 7 个离�
 | 入口 | 内容 |
 | --- | --- |
 | [架构与代码阅读指南](docs/architecture.md) | 一次请求如何流转、存储边界、主要文件职责与推荐阅读顺序 |
+| [前端模块与阅读顺序](docs/frontend.md) | 页面、样式、6 个 JavaScript 模块的分工与浏览器回归方法 |
 | [本地开发](docs/local-development.md) | Windows / Linux 环境、配置、启动、测试与常见问题 |
 | [本机基础设施](ops/README.md) | 已有 PostgreSQL / Milvus 的本机端口绑定与数据保留注意事项 |
 | [数据说明](docs/data-plan.md) | 公开文档快照、演示种子数据及尚未接入的真实数据 |

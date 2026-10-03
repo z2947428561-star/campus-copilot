@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Campus Copilot · XMUM 校园智能助手</title>
+<link rel="stylesheet" href="/assets/css/app.css">
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" aria-label="常用提问">
+    <div class="brand"><div class="brand-mark" aria-hidden="true">厦</div><div><div class="brand-name">Campus Copilot</div><div class="brand-sub">XMUM 校园智能助手</div></div></div>
+    <div class="sidebar-divider"></div>
+    <h2>从这些问题开始</h2>
+    <div class="topic-list">
+      <button type="button" data-question="现在是第几教学周？">现在是第几教学周？</button>
+      <button type="button" data-question="帮我看看这周的课表">帮我看看这周的课表</button>
+      <button type="button" data-question="重修需要交费吗？">重修需要交费吗？</button>
+      <button type="button" data-question="帮我计算目前的 GPA">帮我计算目前的 GPA</button>
+    </div>
+    <div class="sidebar-bottom"><div class="campus-rule"></div><p>把校历、课程与教务政策<br>放在同一场对话里。</p></div>
+  </aside>
+  <div class="workspace">
+    <header class="topbar">
+      <div class="topbar-title">校园事务，问清楚再行动。</div>
+      <div class="mobile-brand">Campus Copilot</div>
+      <div class="user-box">
+        <span class="who">你好，<b id="who"></b></span>
+        <button type="button" class="link-button" id="data-toggle" aria-expanded="false" aria-controls="data-panel" data-action="toggle-data">我的数据</button>
+        <button type="button" class="link-button" id="logout">退出</button>
+      </div>
+    </header>
+    <main id="chat" aria-label="对话记录" aria-live="polite">
+      <section id="welcome">
+        <div class="welcome-symbol" aria-hidden="true">问</div>
+        <h1>今天在校园，<span>想弄清哪件事？</span></h1>
+        <p>问校历、查课表、算 GPA，或了解教务政策。你的问题可以从这里开始。</p>
+        <div class="prompt-grid">
+          <button type="button" data-question="现在是第几教学周？"><span>校历</span>现在是第几教学周？</button>
+          <button type="button" data-question="周三上午有哪些空教室？"><span>教室</span>周三上午有哪些空教室？</button>
+          <button type="button" data-question="重修需要交费吗？"><span>教务政策</span>重修需要交费吗？</button>
+          <button type="button" data-question="帮我计算目前的 GPA"><span>成绩</span>帮我计算目前的 GPA</button>
+        </div>
+      </section>
+    </main>
+    <div id="confirm-bar" role="alertdialog" aria-label="操作确认" aria-describedby="confirm-desc">
+      <div class="desc" id="confirm-desc"></div>
+      <div class="btns">
+        <button type="button" class="yes" id="confirm-yes">确认执行</button>
+        <button type="button" class="no" id="confirm-no">取消操作</button>
+      </div>
+    </div>
+    <footer class="composer">
+      <div class="composer-row"><label class="sr-only" for="input">输入校园问题</label><input id="input" placeholder="输入你的问题…" autocomplete="off"><button type="button" id="send" >发送</button></div>
+      <p class="composer-hint">课程与成绩由你自行录入；演示排课不代表学校实时数据。</p>
+    </footer>
+  </div>
+</div>
+
+<section id="data-panel" aria-label="个人数据" aria-hidden="true">
+  <div class="panel-head"><h2>我的课程与成绩</h2><button type="button" data-action="toggle-data" aria-label="关闭个人数据">关闭</button></div>
+  <p>课程和成绩由你自行录入；排课为演示数据，并非学校系统记录。</p>
+  <h3>添加课程</h3>
+  <div class="row"><input id="course-id" aria-label="课程代码" placeholder="课程代码，如 CS101"><button type="button" id="save-course">添加课程</button></div>
+  <h3>录入成绩</h3>
+  <div class="row"><input id="grade-course" aria-label="成绩对应的课程代码" placeholder="课程代码"><input id="grade-point" aria-label="绩点" type="number" min="0" max="4" step="0.01" placeholder="绩点"><input id="grade-letter" aria-label="等级" placeholder="等级"><button type="button" id="save-grade">保存</button></div>
+  <p id="data-status" role="status"></p><div id="data-list"></div>
+</section>
+
+<div id="login-mask" role="dialog" aria-modal="true" aria-label="登录 Campus Copilot">
+  <div id="login-card">
+    <div class="login-intro"><div class="brand"><div class="brand-mark" aria-hidden="true">厦</div><div><div class="brand-name">Campus Copilot</div><div class="brand-sub">XMUM 校园智能助手</div></div></div><div><h2>校园里的问题，<br>从这里找到线索。</h2><p>校历、课程、成绩和教务政策，整理成一次清楚的对话。</p></div><div class="campus-rule"></div></div>
+    <div class="login-form">
+      <h3>开始使用</h3>
+      <p class="tip">登录后保存你的课程、成绩与个人学习信息。</p>
+      <label for="login-user">用户名</label><input id="login-user" autocomplete="username" aria-describedby="username-hint">
+      <p id="username-hint" class="field-hint">新账号：3 位大写字母 + 7 位数字。</p>
+      <label for="login-pass">密码</label><input id="login-pass" type="password" placeholder="至少 8 位，包含字母和数字" autocomplete="current-password" aria-describedby="password-hint">
+      <p id="password-hint" class="field-hint">新注册密码至少 8 位，须同时包含字母和数字。</p>
+      <p id="login-err" role="alert"></p>
+      <div class="login-actions">
+        <button type="button" class="primary" id="login-submit">登录</button>
+        <button type="button" class="ghost" id="register-submit">注册并登录</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="/assets/js/app.js"></script>
+</body>
+</html>

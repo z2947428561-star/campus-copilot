@@ -31,7 +31,7 @@ def main() -> int:
     })
     with tempfile.TemporaryDirectory(prefix="campus-offline-") as tmp:
         workspace = Path(tmp)
-        for folder in ("src", "scripts", "data/structured", "data/raw_docs"):
+        for folder in ("src", "frontend", "scripts", "data/structured", "data/raw_docs"):
             shutil.copytree(
                 ROOT / folder, workspace / folder,
                 ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".env", "*.db*", "*.local.json"),
