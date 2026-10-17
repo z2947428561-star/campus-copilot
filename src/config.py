@@ -161,6 +161,10 @@ CHROMA_DIR = _env("CHROMA_DIR", "data/chroma_db")
 
 # 检索参数(第10章 §2.5.3 p63-64 的 retrieve(question, k=5))
 KB_TOP_K = _env_int("KB_TOP_K", 5)
+# Both backends use (cosine + 1) / 2 for policy evidence. Initial, uncalibrated cutoff.
+KB_MIN_RELEVANCE = float(_env("KB_MIN_RELEVANCE", "0.70"))
+if not 0 <= KB_MIN_RELEVANCE <= 1:
+    raise ValueError("KB_MIN_RELEVANCE must be between 0 and 1")
 
 
 # ---------------------------------------------------------------- 记忆后端(第09章 §2.2 p14-18)

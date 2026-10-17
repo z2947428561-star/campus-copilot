@@ -13,7 +13,7 @@ RAG 链路:Embedding(云端,课件第10章 §2.4.2 p48-49)→ 向量检索 + 元
 
 设计要点:
 - 工具首次调用时才加载向量库,失败时返回"未接入"提示而不是让 Agent 崩
-- 返回片段附带 [片段N | 相关度 | 来源:《标题》 URL],模型据此引用
+- 返回结构化证据状态、来源类型、日期、章节与稳定 ID，模型据此引用
 - 元数据过滤:doc_type 对应 front matter 的分类(attendance/exam/academic/
   finance/scholarship/visa/general)
 
@@ -25,12 +25,13 @@ RAG 链路:Embedding(云端,课件第10章 §2.4.2 p48-49)→ 向量检索 + 元
     所以这是本项目的自研补强,不要说成"课件教的混合检索"。
 """
 import logging
+import math
 
 from langchain_core.tools import tool
 
 import config
 import kb
-from policy_evidence import evidence_record, evidence_response
+from policy_evidence import evidence_record, evidence_response, rejection_reason
 from tools.schemas import PolicySearchInput
 
 logger = logging.getLogger("campus")
@@ -54,7 +55,26 @@ def _search(query: str, doc_type: str):
             if kb.is_milvus()
             else {"filter": {"doc_type": doc_type}}
         )
-    return vs.similarity_search_with_relevance_scores(query, k=config.KB_TOP_K, **kwargs)
+    milvus = kb.is_milvus()
+    if milvus and config.MILVUS_METRIC.upper() != "COSINE":
+        raise ValueError("Policy evidence requires a COSINE index")
+    hits = vs.similarity_search_with_score(query, k=config.KB_TOP_K, **kwargs)
+    normalized = []
+    for doc, raw in hits:
+        # Some Milvus client versions return dynamic metadata under $meta after reconnect.
+        dynamic = doc.metadata.get("$meta")
+        if isinstance(dynamic, dict):
+            doc = doc.model_copy(update={"metadata": {**dynamic, **doc.metadata}})
+        # Milvus returns cosine similarity; Chroma returns cosine distance.
+        raw = float(raw)
+        cosine = raw if milvus else 1 - raw
+        # Small roundoff at the endpoints is normal for vector calculations.
+        if math.isfinite(cosine) and -1.000001 <= cosine <= 1.000001:
+            score = (max(-1.0, min(1.0, cosine)) + 1) / 2
+        else:
+            score = float("nan")
+        normalized.append((doc, score))
+    return normalized
 
 
 @tool(
@@ -79,41 +99,34 @@ def search_policy(query: str, doc_type: str = "all") -> str:
     # args_schema 里用 "all" 表示不过滤(便于模型理解);这里归一化成"不过滤"
     filter_type = "" if doc_type in ("", "all") else doc_type
 
-    try:
-        hits = _search(query, filter_type)
-    except Exception as e:  # noqa: BLE001
-        logger.warning("[政策检索] 出错: %r", e)
-        return evidence_response("unavailable", reason="query_failed")
-
-    if hits is None:
-        return evidence_response("unavailable", reason="index_unavailable")
-
-    fallback_note = ""
-    if filter_type:
-        # 过滤召回 + 全库召回,按相关度合并去重(见模块 docstring 说明)
+    candidates, completed, failed = [], 0, 0
+    for category in ([filter_type, ""] if filter_type else [""]):
         try:
-            all_hits = _search(query, "")
-        except Exception:  # noqa: BLE001
-            all_hits = []
-
-        def _key(pair):
-            doc, _ = pair
-            return (doc.metadata.get("filename"), doc.page_content[:80])
-
-        filtered_keys = {_key(p) for p in hits}
-        seen, merged = set(), []
-        for pair in sorted(list(hits) + list(all_hits), key=lambda x: -x[1]):
-            k = _key(pair)
-            if k in seen:
+            hits = _search(query, category)
+            if hits is None:
+                failed += 1
                 continue
-            seen.add(k)
-            merged.append(pair)
-        # 只在全库召回确实带回了过滤召回没有的片段时才提示(旧版只看 Top1 分数高低)
-        if any(k not in filtered_keys for k in seen):
-            fallback_note = "(另外合并了全库检索结果)"
-        hits = merged[: config.KB_TOP_K]
+            candidates.extend(hits)
+            completed += 1
+        except Exception as exc:  # noqa: BLE001
+            failed += 1
+            logger.warning("[政策检索] 查询失败: %s", type(exc).__name__)
+    if not completed:
+        return evidence_response("unavailable", reason="retrieval_unavailable")
 
-    if not hits:
-        return evidence_response("insufficient_evidence", reason="no_hits")
-
-    return evidence_response("evidence_found", [evidence_record(doc, score) for doc, score in hits])
+    records, rejected = {}, set()
+    for doc, score in candidates:
+        reason = rejection_reason(doc, score, config.KB_MIN_RELEVANCE)
+        if reason:
+            rejected.add(reason)
+            continue
+        record = evidence_record(doc, score)
+        old = records.get(record["id"])
+        if old is None or score > old["score"]:
+            records[record["id"]] = record
+    evidence = sorted(records.values(), key=lambda r: (-r["score"], r["id"]))[:config.KB_TOP_K]
+    return evidence_response(
+        "evidence_found" if evidence else "insufficient_evidence", evidence,
+        reason="" if evidence else (",".join(sorted(rejected)) or "no_hits"),
+        partial=bool(failed),
+    )

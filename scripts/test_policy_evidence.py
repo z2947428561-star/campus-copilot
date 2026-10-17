@@ -70,6 +70,54 @@ class ProvenanceTests(unittest.TestCase):
 
 
 class EvidenceGateTests(unittest.TestCase):
+    def test_milvus_client_preserves_dynamic_provenance(self):
+        import langchain_milvus
+        with patch.object(policy.kb, "_ensure_milvus_collection"), \
+             patch.object(policy.kb, "get_embeddings"), \
+             patch.object(langchain_milvus, "Milvus") as constructor:
+            policy.kb._build_milvus()
+        self.assertTrue(constructor.call_args.kwargs["enable_dynamic_field"])
+
+    def test_milvus_nested_metadata_after_reconnect(self):
+        doc = Document(page_content="Minimum attendance is 80%.", metadata={"$meta": sample_doc().metadata})
+        store = Mock()
+        store.similarity_search_with_score.return_value = [(doc, .8)]
+        with patch.object(policy.kb, "get_vectorstore", return_value=store), \
+             patch.object(policy.kb, "is_milvus", return_value=True):
+            result = json.loads(policy.search_policy.invoke({"query": "考勤"}))
+        self.assertEqual(result["evidence"][0]["source_type"], "manual_summary")
+
+    def test_real_chroma_cosine_distance_is_normalized(self):
+        import gc
+        from langchain_core.embeddings import Embeddings
+
+        class Vectors(Embeddings):
+            def embed_documents(self, texts):
+                return [[.6, .8] for _ in texts]
+
+            def embed_query(self, text):
+                return [1., 0.]
+
+        kb = policy.kb
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch.object(kb.config, "KB_BACKEND", "chroma"), \
+             patch.object(kb.config, "CHROMA_DIR", tmp), \
+             patch.object(kb.config, "MILVUS_COLLECTION", "policy_evidence_test"), \
+             patch.object(kb, "get_embeddings", return_value=Vectors()):
+            kb.reset_cache()
+            store = kb.get_vectorstore(fresh=True)
+            try:
+                store.add_documents([sample_doc()])
+                result = json.loads(policy.search_policy.invoke({"query": "考勤"}))
+                self.assertEqual(result["status"], "evidence_found")
+                self.assertAlmostEqual(result["evidence"][0]["score"], .8, places=5)
+            finally:
+                kb.reset_cache()
+                del store
+                from chromadb.api.client import SharedSystemClient
+                SharedSystemClient.clear_system_cache()
+                gc.collect()
+
     def invoke_hits(self, hits, **kwargs):
         with patch.object(policy, "_search", return_value=hits):
             return json.loads(policy.search_policy.invoke({"query": "考勤", **kwargs}))

@@ -1,8 +1,32 @@
 """Policy evidence records: provenance and reproducible citation identity."""
 import hashlib
 import json
+import math
+from urllib.parse import quote, urlsplit
 
 SOURCE_TYPES = {"manual_summary", "official_excerpt", "student_experience", "unknown"}
+
+
+def rejection_reason(doc, score, minimum: float) -> str:
+    """A candidate gate, not a claim of entailment or current policy validity."""
+    if not isinstance(score, (int, float)) or not math.isfinite(score) or not 0 <= score <= 1:
+        return "invalid_score"
+    if score < minimum:
+        return "below_threshold"
+    if not doc.page_content.strip():
+        return "empty_text"
+    kind = doc.metadata.get("source_type")
+    if kind not in {"manual_summary", "official_excerpt"}:
+        return "unknown_or_non_policy_source"
+    try:
+        url = urlsplit(doc.metadata.get("source", ""))
+        host = url.hostname or ""
+        official = host == "xmu.edu.my" or host.endswith(".xmu.edu.my") or host == "zs.xmu.edu.cn"
+        if url.scheme not in {"http", "https"} or not official or url.username or url.password:
+            return "invalid_source_url"
+    except (TypeError, ValueError):
+        return "invalid_source_url"
+    return ""
 
 
 def evidence_record(doc, score: float) -> dict:
@@ -11,7 +35,7 @@ def evidence_record(doc, score: float) -> dict:
     source_type = meta.get("source_type", "unknown")
     record = {
         "title": meta.get("title") or meta.get("filename") or "未知文档",
-        "source": meta.get("source", ""),
+        "source": quote(meta.get("source") or "", safe=":/?#[]@!$&'*+,;=%-._~"),
         "source_type": source_type if source_type in SOURCE_TYPES else "unknown",
         "collected_at": meta.get("collected_at") or "unknown",
         "effective_date": meta.get("effective_date") or "unknown",

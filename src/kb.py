@@ -225,6 +225,9 @@ def _build_milvus(fresh: bool = False):
         primary_field="id",
         text_field="text",
         vector_field="vector",
+        # The server schema already enables dynamic metadata; the client must too,
+        # otherwise langchain-milvus silently discards provenance when inserting.
+        enable_dynamic_field=True,
         # 关键:显式给 metric_type,相关性分数才按 COSINE 归一化(见模块 docstring 第 2 点)
         index_params=_MILVUS_INDEX_PARAMS,
     )
@@ -248,6 +251,8 @@ def _build_chroma(fresh: bool = False):
         persist_directory=str(Path(config.CHROMA_DIR)),
         collection_metadata={"hnsw:space": "cosine"},
     )
+    if not fresh and (store._collection.metadata or {}).get("hnsw:space") != "cosine":
+        raise ValueError("Existing Chroma index is not COSINE; rebuild it before policy retrieval")
     if fresh:
         store.delete_collection()
         store = Chroma(
