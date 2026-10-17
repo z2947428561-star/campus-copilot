@@ -3,6 +3,9 @@ title: 国际学生签证续签要求
 source: https://zs.xmu.edu.cn/info/1042/33242.htm
 doc_type: visa
 lang: zh
+source_type: manual_summary
+collected_at: unknown
+effective_date: unknown
 ---
 # 学生签证续签规定(2025 年中国招生简章)
 

@@ -22,7 +22,7 @@
    - 旧版没给中文 separators;实测在 chunk_size=600 下加中文 separators
      **输出逐块完全相同** —— 所以"加 separators"必须和"调小 chunk_size"一起做。
    - 补上 add_start_index=True(第10章 §2.3.3 p25-26、p31-33 专门演示了它),
-     这样引用可以带原文偏移,不再只有"片段序号"。
+     偏移相对标题切分后的章节文本，不是原文件偏移。
    - Markdown 语料先按标题做一级切分(第10章 §2.3.4 p43-46),让每个 chunk
      自带标题路径,缓解"片段脱离上下文"。
 
@@ -62,7 +62,7 @@ def load_markdown_docs():
     """读取 raw_docs 下所有 md,解析 YAML front matter 为元数据。
 
     手写解析而不用 PyYAML 的 frontmatter 库:我们的头只有
-    title/source/doc_type/lang 四个键值对,不值得引入依赖。
+    单行字符串键值对（含来源类型和日期），不值得引入依赖。
 
     注意**不要**换成 UnstructuredMarkdownLoader:它不解析 YAML front matter,
     会把 doc_type / title / source 全丢掉,而"元数据随 chunk 传播"正是
@@ -81,6 +81,8 @@ def load_markdown_docs():
                 k, _, v = line.partition(":")
                 meta[k.strip()] = v.strip()
         meta.setdefault("filename", path.name)
+        for key in ("source_type", "collected_at", "effective_date"):
+            meta.setdefault(key, "unknown")
         docs.append(raw[m.end():])
         metadatas.append(meta)
     return docs, metadatas
@@ -114,6 +116,7 @@ def split_documents(docs, metadatas):
         for section in md_splitter.split_text(body):
             # 标题层级(第10章 p43-44:让分块继承父级标题上下文)
             section_meta = {**meta, **section.metadata}
+            section_meta["offset_scope"] = "section"
             for piece in text_splitter.split_documents(
                 [Document(page_content=section.page_content, metadata=section_meta)]
             ):

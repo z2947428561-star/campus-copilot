@@ -3,6 +3,9 @@ title: 请假与休学规定
 source: https://www.xmu.edu.my/sites/default/files/2025-12/SFS Student Handbook 2025 (Dec 2025 Semester).pdf
 doc_type: academic
 lang: en
+source_type: manual_summary
+collected_at: unknown
+effective_date: unknown
 ---
 # Leave of Absence(SFS 学生手册 2025 第 3.5 节)
 

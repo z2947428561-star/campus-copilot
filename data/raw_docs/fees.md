@@ -3,6 +3,9 @@ title: 学费与行政费用
 source: https://www.xmu.edu.my/sites/default/files/2025-10/Xmum Student Book 2026 (2).pdf
 doc_type: finance
 lang: en
+source_type: manual_summary
+collected_at: unknown
+effective_date: unknown
 ---
 # Tuition Fees and Administrative Fees(大学学生手册 2026 第 7.1 节)
 

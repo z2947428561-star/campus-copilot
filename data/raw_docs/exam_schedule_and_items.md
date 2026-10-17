@@ -3,6 +3,9 @@ title: 考试时间表与考场规则
 source: https://www.xmu.edu.my/sites/default/files/2025-12/Undergraduate-Student-Handbook-2025.pdf
 doc_type: exam
 lang: en
+source_type: manual_summary
+collected_at: unknown
+effective_date: unknown
 ---
 # Final Examination Schedule(本科生手册 2025 第 4.5 节)
 

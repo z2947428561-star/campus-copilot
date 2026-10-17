@@ -3,6 +3,9 @@ title: 学生手册索引(官方文件清单)
 source: https://www.xmu.edu.my/campus-life/student-handbook
 doc_type: general
 lang: en
+source_type: manual_summary
+collected_at: unknown
+effective_date: unknown
 ---
 # Student Handbook(官方手册清单,下载自 www.xmu.edu.my/campus-life/student-handbook)
 

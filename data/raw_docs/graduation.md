@@ -3,6 +3,9 @@ title: 毕业与学位要求
 source: https://www.xmu.edu.my/sites/default/files/2025-10/Xmum Student Book 2026 (2).pdf
 doc_type: academic
 lang: en
+source_type: manual_summary
+collected_at: unknown
+effective_date: unknown
 ---
 # Graduation Requirements(大学学生手册 2026 第 6.0 节)
 

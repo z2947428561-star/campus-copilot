@@ -3,6 +3,9 @@ title: 期末考试缓考规定
 source: https://www.xmu.edu.my/sites/default/files/2025-12/Undergraduate-Student-Handbook-2025.pdf
 doc_type: exam
 lang: en
+source_type: manual_summary
+collected_at: unknown
+effective_date: unknown
 ---
 # Deferment of Final Examination(本科生手册 2025 第 4.3 节)
 

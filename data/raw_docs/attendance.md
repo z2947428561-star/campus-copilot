@@ -3,6 +3,9 @@ title: 考勤要求与禁考规定
 source: https://www.xmu.edu.my/sites/default/files/2025-12/Undergraduate-Student-Handbook-2025.pdf
 doc_type: attendance
 lang: en
+source_type: manual_summary
+collected_at: unknown
+effective_date: unknown
 ---
 # Attendance Requirements(本科生手册 2025 第 4.1 节)
 

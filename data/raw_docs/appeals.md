@@ -3,6 +3,9 @@ title: 成绩申诉与纪律申诉
 source: https://www.xmu.edu.my/sites/default/files/2025-10/Xmum Student Book 2026 (2).pdf
 doc_type: academic
 lang: en
+source_type: manual_summary
+collected_at: unknown
+effective_date: unknown
 ---
 # Appeal Rules and Regulations(大学学生手册 2026 第 5.2 节)
 

@@ -3,6 +3,9 @@ title: 电子服务平台(e-Services)与常用办公室
 source: https://www.xmu.edu.my/sites/default/files/2025-12/SFS Student Handbook 2025 (Dec 2025 Semester).pdf
 doc_type: general
 lang: en
+source_type: manual_summary
+collected_at: unknown
+effective_date: unknown
 ---
 # e-Service System(SFS 学生手册 2025)
 

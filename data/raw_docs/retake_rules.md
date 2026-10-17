@@ -3,6 +3,9 @@ title: 重修规定与费用
 source: https://www.xmu.edu.my/sites/default/files/2025-12/SFS Student Handbook 2025 (Dec 2025 Semester).pdf
 doc_type: academic
 lang: en
+source_type: manual_summary
+collected_at: unknown
+effective_date: unknown
 ---
 # Retaking a Course(SFS 学生手册 2025 第 2.5.9 节)
 

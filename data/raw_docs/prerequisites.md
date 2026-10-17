@@ -3,6 +3,9 @@ title: 先修课程规定
 source: https://www.xmu.edu.my/sites/default/files/2025-12/SFS Student Handbook 2025 (Dec 2025 Semester).pdf
 doc_type: academic
 lang: en
+source_type: manual_summary
+collected_at: unknown
+effective_date: unknown
 ---
 # Courses with Prerequisites(SFS 学生手册 2025 第 2.5.10 节)
 

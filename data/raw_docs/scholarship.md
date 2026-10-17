@@ -3,6 +3,9 @@ title: 奖学金与助学金
 source: https://www.xmu.edu.my/admissions/scholarships-financial-aid
 doc_type: scholarship
 lang: en
+source_type: manual_summary
+collected_at: unknown
+effective_date: unknown
 ---
 # Merit Scholarship(入学奖学金)
 

@@ -477,7 +477,12 @@ def main():
     DOCS_DIR.mkdir(parents=True, exist_ok=True)
 
     for filename, meta, body in DOCS:
-        content = f"---\n{meta}---\n{body}"
+        provenance = (
+            "source_type: manual_summary\n"
+            "collected_at: unknown\n"
+            "effective_date: unknown\n"
+        )
+        content = f"---\n{meta}{provenance}---\n{body}"
         (DOCS_DIR / filename).write_text(content, encoding="utf-8")
         print(f"写入 {filename}")
 

@@ -30,6 +30,7 @@ from langchain_core.tools import tool
 
 import config
 import kb
+from policy_evidence import evidence_record, evidence_response
 from tools.schemas import PolicySearchInput
 
 logger = logging.getLogger("campus")
@@ -60,20 +61,20 @@ def _search(query: str, doc_type: str):
     parse_docstring=True,
     args_schema=PolicySearchInput,
     description=(
-        "检索 XMUM 教务政策官方规定(补考、重修、缓考、考勤、请假、申诉、奖学金、签证等)。"
-        "返回知识库命中的规定原文片段及其官方来源。"
-        "回答政策问题时必须以片段原文为准,并明确告知用户信息来源(文档标题与官方 URL)。"
+        "检索 XMUM 教务政策资料(补考、重修、缓考、考勤、请假、申诉、奖学金、签证等)。"
+        "返回带来源类型、日期与证据 ID 的 JSON。人工整理快照不能当作官方原文。"
+        "回答须核对片段覆盖范围，并以 [证据ID](来源URL) 引用。"
     ),
 )
 def search_policy(query: str, doc_type: str = "all") -> str:
-    """检索教务政策官方规定。
+    """检索教务政策资料。
 
     Args:
         query: 自然语言问题或关键词,如「补考和重修的区别」「出勤率要求」。
         doc_type: 可选分类过滤,取值见 schemas.DOC_TYPE_VALUES;不确定时留 all。
 
     Returns:
-        命中片段与来源的文本;知识库未接入或没有命中时给出诚实说明与官网指引。
+        带来源、证据状态与官网指引的 JSON 字符串。
     """
     # args_schema 里用 "all" 表示不过滤(便于模型理解);这里归一化成"不过滤"
     filter_type = "" if doc_type in ("", "all") else doc_type
@@ -82,14 +83,10 @@ def search_policy(query: str, doc_type: str = "all") -> str:
         hits = _search(query, filter_type)
     except Exception as e:  # noqa: BLE001
         logger.warning("[政策检索] 出错: %r", e)
-        return f"检索出错:{e!r}。请告知用户稍后再试,或访问 www.xmu.edu.my 查询。"
+        return evidence_response("unavailable", reason="query_failed")
 
     if hits is None:
-        return (
-            "教务政策知识库未接入(需先运行 scripts/build_kb.py 建库,"
-            "并确认 .env 的 EMBED_API_KEY 与 KB_BACKEND 配置正确)。"
-            "请如实告知用户当前无法查政策原文,建议访问官网 www.xmu.edu.my。"
-        )
+        return evidence_response("unavailable", reason="index_unavailable")
 
     fallback_note = ""
     if filter_type:
@@ -117,20 +114,6 @@ def search_policy(query: str, doc_type: str = "all") -> str:
         hits = merged[: config.KB_TOP_K]
 
     if not hits:
-        return (
-            f"知识库中没有找到与「{query}」相关的规定片段。"
-            "请如实告知用户,建议查阅官网 www.xmu.edu.my 或咨询教务处 xmumac@xmu.edu.my。"
-        )
+        return evidence_response("insufficient_evidence", reason="no_hits")
 
-    parts = [f"命中 {len(hits)} 个相关规定片段(按相关度排序){fallback_note}:"]
-    for i, (doc, score) in enumerate(hits, 1):
-        title = doc.metadata.get("title") or doc.metadata.get("filename") or "未知文档"
-        source = doc.metadata.get("source", "")
-        start_idx = doc.metadata.get("start_index")
-        locator = f" §offset{start_idx}" if start_idx is not None else ""
-        parts.append(
-            f"\n[片段{i} | 相关度{score:.2f} | 来源:《{title}》{locator} {source}]\n"
-            f"{doc.page_content.strip()}"
-        )
-    parts.append("\n(以上为官方手册原文摘录;回答时请引用来源,数字与流程以原文为准)")
-    return "\n".join(parts)
+    return evidence_response("evidence_found", [evidence_record(doc, score) for doc, score in hits])
