@@ -1,4 +1,5 @@
-import { streamChat } from './api.js';
+import { requestJSON, streamChat } from './api.js';
+import { getUser } from './session.js';
 
 export function createChat() {
   const container = document.getElementById('chat');
@@ -8,6 +9,60 @@ export function createChat() {
   let busy = false;
   let pendingResume = false;
   let controller = null;
+  let conversationId = null;
+  let loading = false;
+  let generation = 0;
+  const selector = document.getElementById('conversation-select');
+  const status = document.getElementById('conversation-status');
+  const selectionKey = () => 'cc_conversation:' + getUser();
+
+  async function open(conversation = null) {
+    if (busy) return;
+    const version = ++generation;
+    loading = true;
+    sendButton.disabled = true;
+    status.textContent = '正在读取会话…';
+    try {
+      const { conversations } = await requestJSON('/api/conversations');
+      if (version !== generation) return;
+      selector.replaceChildren();
+      for (const item of conversations) {
+        const option = document.createElement('option');
+        option.value = item.id;
+        const date = item.created_at ? ' · ' + new Date(item.created_at * 1000).toLocaleString() : '';
+        option.textContent = item.title + date;
+        selector.appendChild(option);
+      }
+      const wanted = conversation || sessionStorage.getItem(selectionKey());
+      conversationId = conversations.some(item => item.id === wanted) ? wanted : conversations[0]?.id;
+      selector.value = conversationId;
+      sessionStorage.setItem(selectionKey(), conversationId);
+      container.querySelectorAll('.msg').forEach(node => node.remove());
+      container.classList.remove('has-messages');
+      pendingResume = false;
+      confirmation.style.display = 'none';
+      status.textContent = '';
+    } catch (error) {
+      if (version === generation) status.textContent = error.message;
+    } finally {
+      if (version === generation) { loading = false; sendButton.disabled = !conversationId; }
+    }
+  }
+
+  async function createConversation() {
+    if (busy || loading) return;
+    loading = true;
+    try {
+      const version = generation;
+      const item = await requestJSON('/api/conversations', { method: 'POST' });
+      if (version === generation) await open(item.id);
+    } catch (error) { status.textContent = error.message; }
+    finally { loading = false; }
+  }
+
+  selector.addEventListener('change', () => open(selector.value));
+  document.getElementById('new-conversation').addEventListener('click', createConversation);
+  document.getElementById('refresh-conversation').addEventListener('click', () => open(conversationId));
 
   function addMessage(kind, text = '', withCursor = false) {
     container.classList.add('has-messages');
@@ -34,7 +89,7 @@ export function createChat() {
     const cursor = message.lastChild;
     let interrupted = false;
     try {
-      await streamChat(body, event => {
+      await streamChat({ ...body, conversation_id: conversationId }, event => {
         if (controller !== current) return;
         if (event.type === 'token') text.textContent += event.text;
         else if (event.type === 'interrupt') {
@@ -64,7 +119,7 @@ export function createChat() {
   }
 
   async function send(question) {
-    if (busy) return;
+    if (busy || loading || !conversationId) return;
     const text = (question ?? input.value).trim();
     if (!text) return;
     input.value = '';
@@ -81,6 +136,11 @@ export function createChat() {
   }
 
   function reset() {
+    generation++;
+    conversationId = null;
+    loading = false;
+    selector.replaceChildren();
+    status.textContent = '';
     controller?.abort();
     controller = null;
     busy = pendingResume = false;
@@ -91,5 +151,5 @@ export function createChat() {
     confirmation.style.display = 'none';
   }
 
-  return { send, decide, reset, focus: () => input.focus() };
+  return { send, decide, reset, open, focus: () => input.focus() };
 }

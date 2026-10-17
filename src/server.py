@@ -58,6 +58,7 @@ from agent.memory import close_memory
 from agent.runtime import default_thread_id, make_config, setup_langsmith
 from agent.streaming import stream_turn
 from context import UserContext
+import conversations
 from student_data import (
     delete_course, delete_grade, init_student_data, list_courses, list_grades,
     set_course, set_grade,
@@ -77,6 +78,7 @@ async def lifespan(_app: FastAPI):
     """启动建鉴权表;退出释放 checkpointer / store 的连接(优雅停机)。"""
     auth.init_auth()
     init_student_data()
+    conversations.init_conversations()
     yield
     close_memory()
 
@@ -114,6 +116,7 @@ class ChatRequest(BaseModel):
     message: str | None = Field(default=None, max_length=4000)  # 限制单次模型输入成本
     resume: bool | None = None          # 单个动作的放行/拒绝(true/false)
     decisions: list[dict] | None = None # 完整决策列表(多动作 / edit 时用)
+    conversation_id: str = Field(default="main", min_length=1, max_length=64)
 
 
 class AuthRequest(BaseModel):
@@ -208,6 +211,23 @@ def _sse(event: dict) -> str:
     return f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
 
 
+def owned_conversation(user_id: str, conversation_id: str):
+    try:
+        return conversations.get_conversation(user_id, conversation_id)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail="会话不存在") from e
+
+
+@app.get("/api/conversations")
+def conversation_list(user_id: str = Depends(current_user)):
+    return {"conversations": conversations.list_conversations(user_id)}
+
+
+@app.post("/api/conversations")
+def conversation_create(user_id: str = Depends(current_user)):
+    return conversations.create_conversation(user_id)
+
+
 @app.get("/")
 def index():
     return FileResponse(FRONTEND_DIR / "index.html")
@@ -239,8 +259,9 @@ def _build_inputs(req: ChatRequest):
 
 @app.post("/api/chat")
 def chat(req: ChatRequest, user_id: str = Depends(current_user)):
+    owned_conversation(user_id, req.conversation_id)
     agent = get_web_agent()
-    thread_id = default_thread_id(user_id)
+    thread_id = conversations.thread_id_for(user_id, req.conversation_id)
     cfg = make_config(
         thread_id=thread_id,
         user_id=user_id,
@@ -252,6 +273,8 @@ def chat(req: ChatRequest, user_id: str = Depends(current_user)):
     inputs = _build_inputs(req)
     if inputs is None:
         return {"error": "message 与 resume / decisions 必须提供其中之一"}
+    if req.message:
+        conversations.name_conversation(user_id, req.conversation_id, req.message)
 
     def event_stream():
         # 真流式:旧版把事件攒在 emitted 列表里、stream_turn 跑完才一次性 yield,

@@ -30,6 +30,13 @@
         <button type="button" class="link-button" id="logout">退出</button>
       </div>
     </header>
+    <nav class="conversation-bar" aria-label="会话管理">
+      <label for="conversation-select">会话</label>
+      <select id="conversation-select" aria-label="选择会话"></select>
+      <button type="button" class="link-button" id="new-conversation">新建会话</button>
+      <button type="button" class="link-button" id="refresh-conversation">刷新</button>
+    </nav>
+    <p id="conversation-status" role="status" aria-live="polite"></p>
     <main id="chat" aria-label="对话记录" aria-live="polite">
       <section id="welcome">
         <div class="welcome-symbol" aria-hidden="true">问</div>

@@ -7,7 +7,7 @@ import { clearSession, getToken } from './session.js';
 const chat = createChat();
 const studentData = createStudentData();
 const auth = createAuth({
-  onLogin: () => { auth.showChat(); chat.focus(); },
+  onLogin: () => { auth.showChat(); chat.open(); chat.focus(); },
   onLogout: () => showLogin(),
 });
 
@@ -44,5 +44,5 @@ document.addEventListener('keydown', event => {
   if (event.key === 'Escape' && studentData.isOpen()) studentData.toggle();
 });
 
-if (getToken()) { auth.showChat(); chat.focus(); }
+if (getToken()) { auth.showChat(); chat.open(); chat.focus(); }
 else showLogin();
