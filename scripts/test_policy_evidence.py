@@ -5,7 +5,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 os.environ["CAMPUS_SKIP_DOTENV"] = "1"
 os.environ["LANGSMITH_TRACING"] = "false"
@@ -67,6 +67,84 @@ class ProvenanceTests(unittest.TestCase):
             output = policy.search_policy.invoke({"query": "考勤"})
         self.assertNotIn("以上为官方手册原文", output)
         self.assertIn("unknown", output)
+
+
+class EvidenceGateTests(unittest.TestCase):
+    def invoke_hits(self, hits, **kwargs):
+        with patch.object(policy, "_search", return_value=hits):
+            return json.loads(policy.search_policy.invoke({"query": "考勤", **kwargs}))
+
+    def test_invalid_candidates_never_become_evidence(self):
+        for doc, score in [
+            (sample_doc(), .69), (sample_doc(), float("nan")),
+            (sample_doc(), float("inf")), (sample_doc(), 1.1),
+            (sample_doc(), -.1), (sample_doc(), "invalid"),
+            (sample_doc(source_type="student_experience"), .99),
+            (sample_doc(source_type=""), .99), (sample_doc(source=""), .99),
+            (sample_doc(source="https://www.xmu.edu.my.attacker.test/file"), .99),
+            (sample_doc(source="javascript:alert(1)"), .99),
+            (sample_doc(source="https://user:pass@www.xmu.edu.my/file"), .99),
+            (Document(page_content="  ", metadata=sample_doc().metadata), .99),
+        ]:
+            with self.subTest(score=score, metadata=doc.metadata):
+                result = self.invoke_hits([(doc, score)])
+                self.assertEqual(result["status"], "insufficient_evidence")
+                self.assertEqual(result["evidence"], [])
+
+    def test_threshold_boundary_and_official_excerpt(self):
+        result = self.invoke_hits([(sample_doc(source_type="official_excerpt"), .7)])
+        self.assertEqual(result["status"], "evidence_found")
+        self.assertEqual(len(result["evidence"]), 1)
+        with patch.object(policy.config, "KB_MIN_RELEVANCE", .8):
+            self.assertEqual(self.invoke_hits([(sample_doc(), .7)])["status"], "insufficient_evidence")
+
+    def test_unavailable_and_empty_are_distinct_and_do_not_leak_errors(self):
+        self.assertEqual(self.invoke_hits(None)["status"], "unavailable")
+        self.assertEqual(self.invoke_hits([])["status"], "insufficient_evidence")
+        with patch.object(policy, "_search", side_effect=RuntimeError("secret-connection")):
+            output = policy.search_policy.invoke({"query": "考勤"})
+        self.assertEqual(json.loads(output)["status"], "unavailable")
+        self.assertNotIn("secret-connection", output)
+
+    def test_global_fallback_survives_filter_failure_and_none(self):
+        for failed in (None, [], RuntimeError("category offline")):
+            with self.subTest(failed=failed), patch.object(
+                policy, "_search", side_effect=[failed, [(sample_doc(), .9)]]
+            ):
+                result = json.loads(policy.search_policy.invoke({"query": "考勤", "doc_type": "exam"}))
+                self.assertEqual(result["status"], "evidence_found")
+                self.assertEqual(result["partial"], failed != [])
+
+    def test_failed_global_search_preserves_valid_filtered_evidence(self):
+        with patch.object(policy, "_search", side_effect=[[(sample_doc(), .9)], None]):
+            result = json.loads(policy.search_policy.invoke({"query": "考勤", "doc_type": "attendance"}))
+        self.assertTrue(result["partial"])
+        self.assertEqual(len(result["evidence"]), 1)
+
+    def test_full_content_deduplication_and_sorting(self):
+        first, second = sample_doc(), sample_doc()
+        first.page_content = "x" * 100 + "80%"
+        second.page_content = "x" * 100 + "90%"
+        with patch.object(policy, "_search", side_effect=[[(first, .8)], [(first, .9), (second, .95)]]):
+            result = json.loads(policy.search_policy.invoke({"query": "考勤", "doc_type": "attendance"}))
+        self.assertEqual([e["score"] for e in result["evidence"]], [.95, .9])
+
+    def test_both_backend_scores_use_same_cosine_scale(self):
+        for milvus, raw in [(True, .4), (False, .6)]:
+            store = Mock()
+            store.similarity_search_with_score.return_value = [(sample_doc(), raw)]
+            with self.subTest(milvus=milvus), \
+                 patch.object(policy.kb, "get_vectorstore", return_value=store), \
+                 patch.object(policy.kb, "is_milvus", return_value=milvus):
+                result = json.loads(policy.search_policy.invoke({"query": "考勤"}))
+            self.assertAlmostEqual(result["evidence"][0]["score"], .7)
+
+    def test_non_cosine_milvus_is_unavailable(self):
+        with patch.object(policy.kb, "get_vectorstore", return_value=Mock()), \
+             patch.object(policy.kb, "is_milvus", return_value=True), \
+             patch.object(policy.config, "MILVUS_METRIC", "L2"):
+            result = json.loads(policy.search_policy.invoke({"query": "考勤"}))
+        self.assertEqual(result["status"], "unavailable")
 
 
 if __name__ == "__main__":
