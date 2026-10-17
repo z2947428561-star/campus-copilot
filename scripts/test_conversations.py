@@ -3,6 +3,8 @@ import os
 import sys
 import tempfile
 import unittest
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
 from pathlib import Path
 from unittest.mock import patch
@@ -146,6 +148,104 @@ class ConversationTests(unittest.TestCase):
                                         json={"resume": True, "checkpoint_id": "checkpoint-1"})
             self.assertEqual(response.status_code, 409, response.text)
             turn.assert_not_called()
+
+    def test_concurrent_turns_are_serial_per_conversation_and_release_on_error(self):
+        first, second = self.create(), self.create()
+        started, finish = threading.Event(), threading.Event()
+
+        def turn(agent, inputs, cfg, **kwargs):
+            if inputs["messages"][0].content == "wait":
+                started.set()
+                if not finish.wait(5):
+                    raise RuntimeError("test timed out")
+            kwargs["on_token"]("完成")
+
+        def send(item, message):
+            return self.client.post('/api/chat', headers=self.owner,
+                                    json={"conversation_id": item["id"], "message": message})
+
+        with patch.object(self.server, "get_web_agent", return_value=fake_agent()), \
+             patch.object(self.server, "stream_turn", side_effect=turn), ThreadPoolExecutor() as pool:
+            future = pool.submit(send, first, "wait")
+            try:
+                self.assertTrue(started.wait(5))
+                self.assertEqual(send(first, "conflict").status_code, 409)
+                state = self.client.get('/api/conversations/' + first["id"], headers=self.owner).json()
+                self.assertTrue(state["running"])
+                self.assertEqual(send(second, "independent").status_code, 200)
+            finally:
+                finish.set()
+            self.assertEqual(future.result(timeout=5).status_code, 200)
+            self.assertEqual(send(first, "retry").status_code, 200)
+
+        with patch.object(self.server, "get_web_agent", return_value=fake_agent()), \
+             patch.object(self.server, "stream_turn", side_effect=RuntimeError("private detail")):
+            response = send(first, "failure")
+            self.assertIn("服务暂时不可用", response.text)
+            self.assertNotIn("private detail", response.text)
+        with patch.object(self.server, "get_web_agent", return_value=fake_agent()), \
+             patch.object(self.server, "stream_turn", side_effect=turn):
+            self.assertEqual(send(first, "after failure").status_code, 200)
+
+    def test_exhausted_conversation_returns_actionable_feedback(self):
+        import config
+        agent = fake_agent()
+        snapshot = agent.get_state({})
+        snapshot.values["thread_model_call_count"] = config.MODEL_CALL_THREAD_LIMIT
+        with patch.object(self.server, "get_web_agent", return_value=agent), \
+             patch.object(self.server, "stream_turn") as turn:
+            state = self.client.get('/api/conversations/main', headers=self.owner).json()
+            self.assertTrue(state["exhausted"])
+            response = self.client.post('/api/chat', headers=self.owner, json={"message": "hi"})
+            self.assertEqual(response.status_code, 429)
+            self.assertIn("新建会话", response.json()["detail"])
+            turn.assert_not_called()
+        with patch.object(self.server, "get_web_agent", return_value=fake_agent()), \
+             patch.object(self.server, "stream_turn"):
+            fresh = self.create()
+            response = self.client.post('/api/chat', headers=self.owner,
+                                        json={"message": "hi", "conversation_id": fresh["id"]})
+            self.assertEqual(response.status_code, 200)
+
+    def test_real_graph_limits_surface_without_network(self):
+        from langchain.agents import create_agent
+        from langchain_core.language_models.fake_chat_models import FakeMessagesListChatModel
+        from langchain_core.messages import AIMessage, HumanMessage
+        from langchain_core.tools import tool
+        from langgraph.checkpoint.memory import InMemorySaver
+        from agent.middleware import get_call_limit_middlewares
+        from agent.streaming import stream_turn
+        import config
+
+        class Model(FakeMessagesListChatModel):
+            def bind_tools(self, tools, **kwargs):
+                return self
+
+        called = []
+
+        @tool
+        def echo(text: str) -> str:
+            """Echo the test input."""
+            called.append(text)
+            return text
+
+        calls = [{"name": "echo", "args": {"text": word}, "id": word, "type": "tool_call"}
+                 for word in ("first", "second")]
+        with patch.object(config, "MODEL_CALL_RUN_LIMIT", 1), \
+             patch.object(config, "TOOL_CALL_RUN_LIMIT", 1):
+            agent = create_agent(Model(responses=[AIMessage(content="", tool_calls=calls), AIMessage("结束")]),
+                                 tools=[echo], middleware=get_call_limit_middlewares(),
+                                 checkpointer=InMemorySaver())
+            limits = []
+            cfg = {"configurable": {"thread_id": "limit-test"}, "recursion_limit": 100}
+            stream_turn(agent, {"messages": [HumanMessage("run")]}, cfg, lambda info: None,
+                        on_limit=limits.append)
+            self.assertEqual(called, ["first"])
+            self.assertIn("tool", limits)
+            self.assertIn("model", limits)
+            # A fresh run must reset run counters and remain a valid tool-message chain.
+            reply = stream_turn(agent, {"messages": [HumanMessage("continue")]}, cfg, lambda info: None)
+            self.assertIn("结束", reply)
 
 
 if __name__ == "__main__":
