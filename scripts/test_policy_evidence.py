@@ -195,5 +195,56 @@ class EvidenceGateTests(unittest.TestCase):
         self.assertEqual(result["status"], "unavailable")
 
 
+class AnswerEvaluationTests(unittest.TestCase):
+    def setUp(self):
+        from policy_evidence import evidence_record
+        self.evidence = evidence_record(sample_doc(), .9)
+        self.payload = {"status": "evidence_found", "evidence": [self.evidence]}
+        self.citation = f'[{self.evidence["id"]}]({self.evidence["source"]})'
+        self.answer = f'人工整理快照《考勤要求》（时效未核实）：“Minimum attendance is 80%.” {self.citation}'
+
+    def evaluate(self, answer, payload=None, **kwargs):
+        from eval_policy import evaluate_answer
+        return evaluate_answer(answer, self.payload if payload is None else payload, **kwargs)
+
+    def test_valid_citation_and_exact_quote_pass(self):
+        self.assertEqual(self.evaluate(self.answer), [])
+
+    def test_fabricated_id_wrong_url_and_missing_citation_fail(self):
+        for answer, reason in [
+            (self.answer.replace(self.evidence["id"], "P-0000000000000000"), "unknown_citation"),
+            (self.answer.replace(self.evidence["source"], "https://www.xmu.edu.my/other"), "wrong_source"),
+            ("人工整理快照，时效未核实，出勤率为 80%。", "missing_citation"),
+        ]:
+            with self.subTest(reason=reason):
+                self.assertIn(reason, self.evaluate(answer))
+
+    def test_quote_must_match_the_cited_evidence_in_same_paragraph(self):
+        self.assertIn("unsupported_quote", self.evaluate(self.answer.replace("80%", "90%")))
+        self.assertIn("unsupported_quote", self.evaluate(self.answer.replace(self.citation, "\n\n" + self.citation)))
+
+    def test_provenance_and_temporal_caveats_are_required(self):
+        self.assertIn("missing_provenance", self.evaluate(self.answer.replace("人工整理快照", "官方原文")))
+        self.assertIn("missing_freshness_caveat", self.evaluate(self.answer.replace("时效未核实", "当前有效")))
+
+    def test_refusal_requires_no_invented_policy_details(self):
+        payload = {"status": "insufficient_evidence", "evidence": []}
+        self.assertEqual(self.evaluate("证据不足，无法确认。请咨询教务处。", payload, expect="refuse"), [])
+        errors = self.evaluate("证据不足，但学校要求出勤率 90%。", payload, expect="refuse")
+        self.assertIn("unsupported_policy_number", errors)
+        self.assertIn("missing_refusal", self.evaluate("直接去办公室办即可。", payload, expect="refuse"))
+
+    def test_current_policy_question_requires_refusal_even_with_snapshot(self):
+        self.assertIn("missing_refusal", self.evaluate(self.answer, expect="refuse"))
+
+    def test_offline_eval_fixtures_include_positive_and_negative_controls(self):
+        from eval_policy import run_offline
+        results = run_offline()
+        self.assertGreaterEqual(len(results), 8)
+        self.assertTrue(all(row["ok"] for row in results), results)
+        self.assertTrue(any(row["expected_pass"] for row in results))
+        self.assertTrue(any(not row["expected_pass"] for row in results))
+
+
 if __name__ == "__main__":
     unittest.main()
