@@ -6,63 +6,30 @@ export function createChat() {
   const input = document.getElementById('input');
   const sendButton = document.getElementById('send');
   const confirmation = document.getElementById('confirm-bar');
-  let busy = false;
-  let pendingResume = false;
-  let controller = null;
-  let conversationId = null;
-  let loading = false;
-  let generation = 0;
   const selector = document.getElementById('conversation-select');
   const status = document.getElementById('conversation-status');
+  const newButton = document.getElementById('new-conversation');
+  const refreshButton = document.getElementById('refresh-conversation');
+  const yesButton = document.getElementById('confirm-yes');
+  const noButton = document.getElementById('confirm-no');
+  let busy = false;
+  let loading = false;
+  let pending = [];
+  let checkpointId = null;
+  let conversationId = null;
+  let controller = null;
+  let generation = 0;
   const selectionKey = () => 'cc_conversation:' + getUser();
 
-  async function open(conversation = null) {
-    if (busy) return;
-    const version = ++generation;
-    loading = true;
-    sendButton.disabled = true;
-    status.textContent = '正在读取会话…';
-    try {
-      const { conversations } = await requestJSON('/api/conversations');
-      if (version !== generation) return;
-      selector.replaceChildren();
-      for (const item of conversations) {
-        const option = document.createElement('option');
-        option.value = item.id;
-        const date = item.created_at ? ' · ' + new Date(item.created_at * 1000).toLocaleString() : '';
-        option.textContent = item.title + date;
-        selector.appendChild(option);
-      }
-      const wanted = conversation || sessionStorage.getItem(selectionKey());
-      conversationId = conversations.some(item => item.id === wanted) ? wanted : conversations[0]?.id;
-      selector.value = conversationId;
-      sessionStorage.setItem(selectionKey(), conversationId);
-      container.querySelectorAll('.msg').forEach(node => node.remove());
-      container.classList.remove('has-messages');
-      pendingResume = false;
-      confirmation.style.display = 'none';
-      status.textContent = '';
-    } catch (error) {
-      if (version === generation) status.textContent = error.message;
-    } finally {
-      if (version === generation) { loading = false; sendButton.disabled = !conversationId; }
-    }
+  function controls() {
+    sendButton.disabled = busy || loading || !conversationId || pending.length > 0;
+    input.disabled = sendButton.disabled;
+    selector.disabled = newButton.disabled = refreshButton.disabled = busy || loading;
+    yesButton.disabled = busy || loading || !pending.length ||
+      pending.some(action => !action.allowed_decisions.includes('approve'));
+    noButton.disabled = busy || loading || !pending.length ||
+      pending.some(action => !action.allowed_decisions.includes('reject'));
   }
-
-  async function createConversation() {
-    if (busy || loading) return;
-    loading = true;
-    try {
-      const version = generation;
-      const item = await requestJSON('/api/conversations', { method: 'POST' });
-      if (version === generation) await open(item.id);
-    } catch (error) { status.textContent = error.message; }
-    finally { loading = false; }
-  }
-
-  selector.addEventListener('change', () => open(selector.value));
-  document.getElementById('new-conversation').addEventListener('click', createConversation);
-  document.getElementById('refresh-conversation').addEventListener('click', () => open(conversationId));
 
   function addMessage(kind, text = '', withCursor = false) {
     container.classList.add('has-messages');
@@ -79,47 +46,118 @@ export function createChat() {
     return node;
   }
 
+  function renderPending() {
+    confirmation.style.display = pending.length ? 'flex' : 'none';
+    document.getElementById('confirm-desc').textContent = pending.map((action, index) =>
+      `${index + 1}. ${action.description || '敏感操作需要确认'}\n${action.tool}(${JSON.stringify(action.args)})`
+    ).join('\n\n');
+    yesButton.textContent = pending.length > 1 ? '确认全部执行' : '确认执行';
+    noButton.textContent = pending.length > 1 ? '拒绝全部操作' : '取消操作';
+    controls();
+  }
+
+  function clearMessages() {
+    container.querySelectorAll('.msg').forEach(node => node.remove());
+    container.classList.remove('has-messages');
+  }
+
+  async function open(wanted = null) {
+    if (busy) return;
+    controller?.abort();
+    const current = new AbortController();
+    controller = current;
+    const version = ++generation;
+    loading = true;
+    controls();
+    status.textContent = '正在读取会话…';
+    try {
+      const options = { signal: current.signal };
+      const { conversations } = await requestJSON('/api/conversations', options);
+      if (version !== generation) return;
+      selector.replaceChildren();
+      for (const item of conversations) {
+        const option = document.createElement('option');
+        option.value = item.id;
+        const date = item.created_at ? ' · ' + new Date(item.created_at * 1000).toLocaleString() : '';
+        option.textContent = item.title + date;
+        selector.appendChild(option);
+      }
+      wanted ||= sessionStorage.getItem(selectionKey());
+      conversationId = conversations.some(item => item.id === wanted) ? wanted : conversations[0]?.id;
+      selector.value = conversationId;
+      sessionStorage.setItem(selectionKey(), conversationId);
+      clearMessages();
+      pending = [];
+      checkpointId = null;
+      renderPending();
+      const state = await requestJSON('/api/conversations/' + encodeURIComponent(conversationId), options);
+      if (version !== generation) return;
+      for (const message of state.messages) addMessage(message.role === 'user' ? 'me' : 'bot', message.text);
+      pending = state.pending;
+      checkpointId = state.checkpoint_id;
+      renderPending();
+      status.textContent = pending.length ? '请处理待确认操作，或新建会话。' : '';
+    } catch (error) {
+      if (version === generation && error.name !== 'AbortError') status.textContent = error.message;
+    } finally {
+      if (version === generation) { loading = false; controller = null; controls(); }
+    }
+  }
+
+  async function createConversation() {
+    if (busy || loading) return;
+    const version = generation;
+    const current = new AbortController();
+    controller = current;
+    loading = true;
+    controls();
+    try {
+      const item = await requestJSON('/api/conversations', { method: 'POST', signal: current.signal });
+      if (version === generation) await open(item.id);
+    } catch (error) {
+      if (version === generation && error.name !== 'AbortError') status.textContent = error.message;
+    } finally {
+      if (version === generation) { loading = false; controls(); }
+    }
+  }
+
   async function runTurn(body) {
     const current = new AbortController();
     controller = current;
+    const version = generation;
     busy = true;
-    sendButton.disabled = true;
+    status.textContent = '';
+    pending = [];
+    renderPending();
     const message = addMessage('bot', '', true);
     const text = message.firstChild;
     const cursor = message.lastChild;
-    let interrupted = false;
     try {
-      await streamChat({ ...body, conversation_id: conversationId }, event => {
+      await streamChat({ ...body, conversation_id: conversationId, checkpoint_id: checkpointId }, event => {
         if (controller !== current) return;
         if (event.type === 'token') text.textContent += event.text;
         else if (event.type === 'interrupt') {
-          interrupted = true;
-          document.getElementById('confirm-desc').textContent =
-            '⚠ ' + (event.description || '敏感操作需要确认') + '\n即将执行:'
-            + event.tool + '(' + JSON.stringify(event.args) + ')';
-          confirmation.style.display = 'flex';
-        } else if (event.type === 'error') text.textContent += '\n[出错了] ' + event.message;
+          pending.push(event);
+          checkpointId = event.checkpoint_id;
+        } else if (event.type === 'error') status.textContent = event.message;
         container.scrollTop = container.scrollHeight;
       }, { signal: current.signal });
-      if (controller === current) pendingResume = interrupted;
     } catch (error) {
-      if (controller === current && error.name !== 'AbortError') {
-        text.textContent += '\n[连接失败] ' + error.message;
-      }
+      if (version === generation && error.name !== 'AbortError') status.textContent = error.message;
     } finally {
       cursor.remove();
       if (!text.textContent) message.remove();
-      if (controller === current) {
+      if (version === generation) {
         controller = null;
         busy = false;
-        sendButton.disabled = false;
+        renderPending();
         input.focus();
       }
     }
   }
 
   async function send(question) {
-    if (busy || loading || !conversationId) return;
+    if (busy || loading || !conversationId || pending.length) return;
     const text = (question ?? input.value).trim();
     if (!text) return;
     input.value = '';
@@ -128,28 +166,29 @@ export function createChat() {
   }
 
   async function decide(approved) {
-    if (busy || !pendingResume) return;
-    pendingResume = false;
-    confirmation.style.display = 'none';
-    if (!approved) addMessage('sys', '已拒绝该敏感操作');
-    await runTurn({ resume: approved });
+    if (busy || loading || !pending.length) return;
+    const type = approved ? 'approve' : 'reject';
+    if (pending.some(action => !action.allowed_decisions.includes(type))) return;
+    await runTurn({ decisions: pending.map(() => ({ type })) });
   }
 
   function reset() {
     generation++;
-    conversationId = null;
-    loading = false;
-    selector.replaceChildren();
-    status.textContent = '';
     controller?.abort();
     controller = null;
-    busy = pendingResume = false;
-    sendButton.disabled = false;
+    busy = loading = false;
+    pending = [];
+    conversationId = checkpointId = null;
+    selector.replaceChildren();
+    status.textContent = '';
     input.value = '';
-    container.querySelectorAll('.msg').forEach(node => node.remove());
-    container.classList.remove('has-messages');
-    confirmation.style.display = 'none';
+    clearMessages();
+    renderPending();
   }
 
+  selector.addEventListener('change', () => open(selector.value));
+  newButton.addEventListener('click', createConversation);
+  refreshButton.addEventListener('click', () => open(conversationId));
+  controls();
   return { send, decide, reset, open, focus: () => input.focus() };
 }

@@ -50,10 +50,11 @@ from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from langgraph.types import Command
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 import auth
 from agent.assistant import get_agent
+from agent.conversation_state import conversation_state
 from agent.memory import close_memory
 from agent.runtime import default_thread_id, make_config, setup_langsmith
 from agent.streaming import stream_turn
@@ -117,6 +118,15 @@ class ChatRequest(BaseModel):
     resume: bool | None = None          # 单个动作的放行/拒绝(true/false)
     decisions: list[dict] | None = None # 完整决策列表(多动作 / edit 时用)
     conversation_id: str = Field(default="main", min_length=1, max_length=64)
+    checkpoint_id: str | None = Field(default=None, max_length=128)
+
+    @model_validator(mode="after")
+    def one_operation(self):
+        if sum(value is not None for value in (self.message, self.resume, self.decisions)) != 1:
+            raise ValueError("message、resume、decisions 必须且只能提供一项")
+        if self.message is not None and not self.message.strip():
+            raise ValueError("消息不能为空")
+        return self
 
 
 class AuthRequest(BaseModel):
@@ -228,6 +238,43 @@ def conversation_create(user_id: str = Depends(current_user)):
     return conversations.create_conversation(user_id)
 
 
+def conversation_config(user_id, conversation_id):
+    return make_config(
+        thread_id=conversations.thread_id_for(user_id, conversation_id),
+        user_id=user_id, run_name=f"campus-chat:{user_id}", tags=["campus-copilot", "web"],
+    )
+
+
+@app.get("/api/conversations/{conversation_id}")
+def conversation_detail(conversation_id: str, user_id: str = Depends(current_user)):
+    item = owned_conversation(user_id, conversation_id)
+    state = conversation_state(get_web_agent(), conversation_config(user_id, conversation_id))
+    return {**item, **state}
+
+
+def validate_operation(req, state):
+    pending = state["pending"]
+    if req.message is not None:
+        if pending:
+            raise HTTPException(status_code=409, detail="请先处理待确认操作，或新建会话")
+        return
+    if not pending:
+        raise HTTPException(status_code=409, detail="当前没有待确认操作，请刷新会话")
+    if not req.checkpoint_id or req.checkpoint_id != state["checkpoint_id"]:
+        raise HTTPException(status_code=409, detail="确认状态已改变，请刷新会话后重新决定")
+    decisions = req.decisions if req.decisions is not None else [
+        {"type": "approve" if req.resume else "reject"}]
+    if len(decisions) != len(pending):
+        raise HTTPException(status_code=422, detail="决定数量必须与待确认动作数量一致")
+    for decision, action in zip(decisions, pending):
+        if decision.get("type") not in action["allowed_decisions"]:
+            raise HTTPException(status_code=422, detail="该动作不允许此决定")
+        if decision["type"] == "edit":
+            edited = decision.get("edited_action", {})
+            if edited.get("name") != action["tool"] or not isinstance(edited.get("args"), dict):
+                raise HTTPException(status_code=422, detail="修改必须保留工具名并提供参数对象")
+
+
 @app.get("/")
 def index():
     return FileResponse(FRONTEND_DIR / "index.html")
@@ -261,13 +308,8 @@ def _build_inputs(req: ChatRequest):
 def chat(req: ChatRequest, user_id: str = Depends(current_user)):
     owned_conversation(user_id, req.conversation_id)
     agent = get_web_agent()
-    thread_id = conversations.thread_id_for(user_id, req.conversation_id)
-    cfg = make_config(
-        thread_id=thread_id,
-        user_id=user_id,
-        run_name=f"campus-chat:{user_id}",
-        tags=["campus-copilot", "web"],
-    )
+    cfg = conversation_config(user_id, req.conversation_id)
+    validate_operation(req, conversation_state(agent, cfg))
     user_context = UserContext(user_id=user_id)
 
     inputs = _build_inputs(req)
@@ -287,6 +329,7 @@ def chat(req: ChatRequest, user_id: str = Depends(current_user)):
         _DONE = object()  # 正常结束哨兵
 
         def on_decide(info):
+            checkpoint_id = conversation_state(agent, cfg)["checkpoint_id"]
             for i, action in enumerate(info.action_requests):
                 q.put(
                     {
@@ -300,6 +343,7 @@ def chat(req: ChatRequest, user_id: str = Depends(current_user)):
                         "total": len(info),
                         # 多动作时前端需要按顺序回传同样数量的 decisions
                         "requires_all": len(info) > 1,
+                        "checkpoint_id": checkpoint_id,
                     }
                 )
             # Web 端 HITL 是"发完 interrupt 就断流",由前端下一次请求恢复,
