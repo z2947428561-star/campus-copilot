@@ -19,6 +19,14 @@ function showLogin(message = '') {
 }
 
 setUnauthorizedHandler(showLogin);
+// A login/logout in another tab invalidates this tab's outstanding UI work.
+window.addEventListener('storage', event => {
+  if (event.key !== 'cc_token' && event.key !== 'cc_user' && event.key !== null) return;
+  chat.reset();
+  studentData.reset();
+  if (getToken()) { auth.showChat(); chat.open(); }
+  else auth.showLogin('登录状态已在其他页面改变，请重新登录');
+});
 const bind = (id, callback) => document.getElementById(id).addEventListener('click', callback);
 bind('login-submit', () => auth.submit('login'));
 bind('register-submit', () => auth.submit('register'));

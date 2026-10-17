@@ -193,42 +193,24 @@ def get_summarization() -> SummarizationMiddleware:
 
 # ---------------------------------------------------------------- 4. 调用限额
 def get_call_limit_middlewares() -> list:
-    """模型/工具调用次数上限(课件 §3.1 p34、§3.2 p44)。
+    """Bound each run and the accumulated conversation separately.
 
-    课件 §3.2(p44)给出三种退出行为:error(抛异常)/ end(结束会话)/
-    continue(继续,默认,可能死循环)。这里选 end —— 对本项目更友好:
-    与其抛异常让 Web 端报 500,不如优雅结束本轮。
-
-    为什么需要:第07章 §4.4 问题5/6(p26)指出"默认没有工具调用次数限制,
-    可能会超时",而本项目有 9 个工具、且评估集暴露过"模型反复调工具"的行为。
-
-    ⚠️⚠️ 实测踩坑(重要,别重犯):
-        `thread_limit` 是**按会话累计**的上限,不是"每轮"。计数存在
-        state["thread_model_call_count"] / state["thread_tool_call_count"] 里,
-        由 checkpointer 持久化 —— 所以一个 thread 上的多轮对话会一直累加。
-        一旦触顶,且 exit_behavior="end",该会话后续每一轮都会被**立即结束**:
-        模型不再输出任何内容,回答变成空字符串,**而且不报错**。
-
-        实测证据:评估集 31 题最初共用一个 thread(旧 eval_m6 把没标 thread 的题
-        都归到 "eval-{run_id}"),累计到 thread_limit=30 之后余下题目全部返回空,
-        综合通过率从 81% 掉到 58%,失败原因显示为"关键词未命中"。
-        把上限压到 3 复现时,第 3 题就开始返回空。
-
-        因此:
-          1) 评估/批量场景必须**一题一个 thread**(见 scripts/eval_m6.py 的说明);
-          2) 本项目有持久化多用户会话,长对话很常见(一轮问答约 2-3 次模型调用),
-             所以上限放宽到 config 里的 200 作为成本兜底;
-          3) 单轮的失控保护交给 recursion_limit 与 §3.2 的工具级限额,
-             两者分工不同:recursion_limit 管"一次运行跑多久",
-             thread_limit 管"一个会话总共花多少"。
+    Tool limits inject error ToolMessages and let the model explain the result.
+    This preserves the message chain even when some parallel calls are blocked.
+    Model limits end the graph; streaming.py surfaces their otherwise silent updates.
+    Web users can start a new conversation when the persisted budget is exhausted.
     """
     return [
         ToolCallLimitMiddleware(
             thread_limit=config.TOOL_CALL_THREAD_LIMIT,
-            exit_behavior="end",
+            run_limit=config.TOOL_CALL_RUN_LIMIT,
+            # Supply error ToolMessages for blocked parallel calls, preserving a
+            # resumable message chain. The model budget bounds further reasoning.
+            exit_behavior="continue",
         ),
         ModelCallLimitMiddleware(
             thread_limit=config.MODEL_CALL_THREAD_LIMIT,
+            run_limit=config.MODEL_CALL_RUN_LIMIT,
             exit_behavior="end",
         ),
     ]

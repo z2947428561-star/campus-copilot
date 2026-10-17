@@ -15,6 +15,7 @@ CHECKS = (
     "test_reset_local_password.py",
     "test_student_data.py",
     "test_server_security.py",
+    "test_conversations.py",
     "test_chroma_rebuild.py",
     "test_course_recommendations.py",
 )

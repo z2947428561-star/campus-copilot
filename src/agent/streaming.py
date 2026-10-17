@@ -119,6 +119,7 @@ def stream_turn(
     on_token: Callable[[str], None] | None = None,
     context=None,
     max_interrupt_rounds: int = 3,
+    on_limit: Callable[[str], None] | None = None,
 ) -> str:
     """跑完一轮对话,直到没有待处理中断。
 
@@ -130,6 +131,7 @@ def stream_turn(
         on_token:      每收到一段模型文本增量时回调(CLI 打印 / SSE 推送)
         context:       第09章 §4(p60-80)的运行级静态上下文(承载 user_id)
         max_interrupt_rounds: 防止中断-恢复无限循环
+        on_limit: 模型或工具达到限额时的回调；未提供时以可读文本反馈
 
     返回:本轮模型输出的完整文本。
 
@@ -138,6 +140,7 @@ def stream_turn(
     """
     full_reply = ""
     current_inputs = inputs
+    reported_limits = set()
 
     for _ in range(max_interrupt_rounds):
         pending = None
@@ -155,6 +158,23 @@ def stream_turn(
                         on_token(text)
             elif mode == "updates" and data.get("__interrupt__"):
                 pending = data["__interrupt__"][0]
+            elif mode == "updates":
+                # Limit middleware can end the graph without emitting model tokens.
+                # Identify its node and injected messages, never parse English text.
+                for node, update in data.items():
+                    kind = next((kind for prefix, kind in (
+                        ("ModelCallLimitMiddleware.", "model"),
+                        ("ToolCallLimitMiddleware.", "tool"),
+                    ) if node.startswith(prefix)), None)
+                    if kind and isinstance(update, dict) and update.get("messages") and kind not in reported_limits:
+                        reported_limits.add(kind)
+                        if on_limit:
+                            on_limit(kind)
+                        else:
+                            text = "\n已达到调用上限，请简化问题重试；会话额度耗尽时请新建会话。"
+                            full_reply += text
+                            if on_token:
+                                on_token(text)
 
         if pending is None:
             return full_reply

@@ -15,18 +15,18 @@ def main() -> None:
         "CAMPUS_SKIP_DOTENV": "1",
         "MEMORY_BACKEND": "sqlite",
         "LANGSMITH_TRACING": "false",
+        "MODEL_CALL_THREAD_LIMIT": "6",
+        "MODEL_CALL_RUN_LIMIT": "4",
+        "LLM_FALLBACK_PROVIDER": "none",
     })
     with tempfile.TemporaryDirectory(prefix="campus-browser-") as tmp:
         os.environ["MEMORY_DB_PATH"] = str(Path(tmp) / "memory.db")
         import uvicorn
-        from fastapi import HTTPException
         from src import server
+        from fake_chat_agent import build_agent
 
-        def block_agent():
-            raise HTTPException(status_code=503, detail="Browser tests must mock chat responses")
-
-        server.get_web_agent = block_agent
-        print("Browser-test app: http://127.0.0.1:18765/ (temporary accounts; chat blocked)", flush=True)
+        server._agent = build_agent()
+        print("Browser-test app: http://127.0.0.1:18765/ (temporary accounts; offline fake model)", flush=True)
         uvicorn.run(server.app, host="127.0.0.1", port=18765, log_level="warning", access_log=False)
 
 

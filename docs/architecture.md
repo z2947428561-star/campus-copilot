@@ -23,14 +23,14 @@ sequenceDiagram
 ```
 
 1. `frontend/index.html` 定义页面，`frontend/js/app.js` 绑定事件并协调登录、聊天和个人数据模块；`api.js` 统一发送同源请求与解析 SSE。
-2. `src/server.py` 校验 Bearer token，把服务端确认的身份放进 `UserContext`，再生成用户会话标识。客户端不能自行指定聊天身份。
+2. `src/server.py` 校验 Bearer token，把服务端确认的身份放进 `UserContext`，校验所选会话的归属，再生成内部 thread_id。客户端只能选择自己的会话，不能自行指定聊天身份。
 3. `src/agent/assistant.py` 组装模型、11 个工具、提示词、中间件、Checkpointer 和 Store；Web 按进程延迟创建并复用 Agent。
 4. `src/agent/streaming.py` 统一处理模型增量、工具结果和人工确认中断。Web 的工作线程把事件送入队列，HTTP 响应边接收边发送。
 5. 工具根据用途访问公共 SQLite、个人数据存储或向量库，再由模型生成回答。GPA 由 Python 代码计算，不交给模型心算。
 
-SSE 事件类型包括 `token`、`interrupt`、`done`、`error`。恢复请求使用 `resume` 或 `decisions`，不是另建一个会话。
+SSE 事件类型包括 `token`、`interrupt`、`limit`、`done`、`error`。恢复请求携带同一 `conversation_id`、最新 `checkpoint_id` 和 `decisions`；单动作也兼容 `resume`。
 
-当前网页提供单个确认操作的批准/拒绝按钮；API 和公共流式处理层还支持完整 `decisions`（包含参数修改）。网页尚未实现参数编辑和多动作逐项确认界面。
+网页展示全部待确认动作，支持统一批准或拒绝；后端校验动作数量、允许的决定和检查点版本。HTTP 接口继续支持参数修改，网页尚未提供编辑或逐项混合决定。具体行为见[会话生命周期](conversations.md)。
 
 ## 数据放在哪里
 
@@ -39,6 +39,7 @@ SSE 事件类型包括 `token`、`interrupt`、`done`、`error`。恢复请求�
 | 公共课程、校历、教室、演示排课 | `data/campus.db`（SQLite） | 无切换，始终是 SQLite | `scripts/init_db.py`、`src/tools/` |
 | 可选本机选课经验、教师讨论、问答 | `data/campus.db` 的独立经验表 | 私有 `.local.json` 种子，不混入课程表 | `src/course_recommendations.py`、`src/tools/recommendations.py` |
 | 账号、token 哈希、个人成绩和选课 | PostgreSQL | `MEMORY_BACKEND=sqlite` 时使用 `data/memory.db` 或配置路径 | `src/auth.py`、`src/student_data.py` |
+| 会话归属、标题、创建时间 | PostgreSQL 账号库 | SQLite 账号库 | `src/conversations.py` |
 | 会话状态、人工确认中断现场 | PostgreSQL Checkpointer | SQLite Checkpointer | `src/agent/memory.py` |
 | 长期用户画像 | PostgreSQL Store | SQLite Store | `src/agent/memory.py`、`src/tools/profile.py` |
 | 政策向量与片段元数据 | Milvus | Chroma 本地目录 | `src/kb.py`、`scripts/build_kb.py` |
@@ -86,6 +87,7 @@ SSE 事件类型包括 `token`、`interrupt`、`done`、`error`。恢复请求�
 | 文件或目录 | 职责 |
 | --- | --- |
 | `frontend/index.html`、`frontend/css/app.css`、`frontend/js/` | 页面结构、样式与原生浏览器模块；后端通过 `/assets/` 提供静态资源，模块职责见[前端说明](frontend.md) |
+| `src/conversations.py`、`src/agent/conversation_state.py`、`src/agent/web_runs.py` | 会话登记与归属、检查点展示投影、单进程执行互斥与有界事件队列 |
 | `src/prompts/common.py`、`discipline.py`、`system.py`、`__init__.py` | 公共约束、政策引用与行为规则、系统提示词的组合入口 |
 | `src/messages.py` | 消息结构的公共构造方法 |
 | `src/prompt.py`、`src/bootstrap.py` | 早期 CLI 的提示词与启动辅助代码；先理解 Web 主链再回看 |
@@ -98,7 +100,7 @@ SSE 事件类型包括 `token`、`interrupt`、`done`、`error`。恢复请求�
 | `scripts/build_kb.py` | 解析政策快照、切分并写入向量库 |
 | `scripts/test_auth_*.py`、`test_reset_local_password.py` | 注册、登录、限流、旧账号兼容和重置验证 |
 | `scripts/test_student_data.py`、`test_server_security.py` | 用户隔离、GPA 数据来源、API 边界和页面缓存策略 |
-| `scripts/run_frontend_test_app.py`、`test_frontend.js` | 独立临时账号库的本机浏览器回归；真实鉴权/个人数据 API、模拟聊天，不调用模型 |
+| `scripts/run_frontend_test_app.py`、`test_frontend.js` | 独立临时账号库的本机浏览器回归；真实 HTTP/检查点、本地假模型，不调用外部模型 |
 | `scripts/test_chroma_rebuild.py` | 本地向量重建检查 |
 | `scripts/test_m3.py`、`test_m4.py`、`test_m5.py`、`test_server.py` | 需要模型、数据库或运行中 HTTP 服务的集成验证 |
 | `scripts/eval_m6.py`、`eval_set.json` | 真实模型跑批与固定题目的规则断言 |
@@ -116,7 +118,7 @@ SSE 事件类型包括 `token`、`interrupt`、`done`、`error`。恢复请求�
 后续应优先处理以下边界，再考虑拆服务：
 
 1. **配置和测试隔离**：模块导入时读取配置，容易让同一进程的测试共享状态。离线检查现在逐文件启动新进程，并在临时项目副本中运行。
-2. **多会话与并发**：Web 默认每个用户一个固定主会话，Agent 和记忆连接按进程缓存。本机多标签页并发和请求取消需要专项验证；当前不考虑多实例运行。
+2. **多会话与并发**：Web 已支持新建、切换和刷新恢复，同会话执行互斥；Agent 和记忆连接按进程缓存。断连后后台请求继续到检查点并释放执行锁；当前不支持多实例或强制取消在途模型请求。
 3. **数据与时间范围**：学期和种子数据存在固定范围。多学期支持、政策版本和更新时间，比增加工具数量更直接影响可用性。
 4. **前端维护**：HTML、CSS 和 JavaScript 已分离，浏览器代码按 API、会话、鉴权、聊天和个人数据拆成模块，由 `app.js` 协调。无需引入独立前端服务；后续增加交互时同步扩展浏览器回归。
 5. **身份与运行边界**：用户名格式不代表学校身份认证；登录限流只在进程内生效。只监听本机回环地址，仍需保护 token、数据库和含个人内容的日志。

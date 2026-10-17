@@ -19,15 +19,19 @@ export function createChat() {
   let conversationId = null;
   let controller = null;
   let generation = 0;
+  let running = false;
+  let exhausted = false;
+  let ready = false;
+  let pollTimer = null;
   const selectionKey = () => 'cc_conversation:' + getUser();
 
   function controls() {
-    sendButton.disabled = busy || loading || !conversationId || pending.length > 0;
+    sendButton.disabled = busy || loading || running || exhausted || !ready || !conversationId || pending.length > 0;
     input.disabled = sendButton.disabled;
     selector.disabled = newButton.disabled = refreshButton.disabled = busy || loading;
-    yesButton.disabled = busy || loading || !pending.length ||
+    yesButton.disabled = busy || loading || running || !ready || !pending.length ||
       pending.some(action => !action.allowed_decisions.includes('approve'));
-    noButton.disabled = busy || loading || !pending.length ||
+    noButton.disabled = busy || loading || running || !ready || !pending.length ||
       pending.some(action => !action.allowed_decisions.includes('reject'));
   }
 
@@ -63,11 +67,13 @@ export function createChat() {
 
   async function open(wanted = null) {
     if (busy) return;
+    clearTimeout(pollTimer);
     controller?.abort();
     const current = new AbortController();
     controller = current;
     const version = ++generation;
     loading = true;
+    ready = false;
     controls();
     status.textContent = '正在读取会话…';
     try {
@@ -95,8 +101,14 @@ export function createChat() {
       for (const message of state.messages) addMessage(message.role === 'user' ? 'me' : 'bot', message.text);
       pending = state.pending;
       checkpointId = state.checkpoint_id;
+      running = state.running;
+      exhausted = state.exhausted;
+      ready = true;
       renderPending();
-      status.textContent = pending.length ? '请处理待确认操作，或新建会话。' : '';
+      status.textContent = running ? '该会话仍在处理请求，完成后会自动恢复。也可以新建会话。'
+        : pending.length ? '请处理待确认操作，或新建会话。'
+        : exhausted ? '当前会话额度已用完，请新建会话；原记录仍保留。' : '';
+      if (running) pollTimer = setTimeout(() => open(conversationId), 1500);
     } catch (error) {
       if (version === generation && error.name !== 'AbortError') status.textContent = error.message;
     } finally {
@@ -126,6 +138,7 @@ export function createChat() {
     controller = current;
     const version = generation;
     busy = true;
+    clearTimeout(pollTimer);
     status.textContent = '';
     pending = [];
     renderPending();
@@ -139,7 +152,7 @@ export function createChat() {
         else if (event.type === 'interrupt') {
           pending.push(event);
           checkpointId = event.checkpoint_id;
-        } else if (event.type === 'error') status.textContent = event.message;
+        } else if (event.type === 'error' || event.type === 'limit') status.textContent = event.message;
         container.scrollTop = container.scrollHeight;
       }, { signal: current.signal });
     } catch (error) {
@@ -150,14 +163,18 @@ export function createChat() {
       if (version === generation) {
         controller = null;
         busy = false;
-        renderPending();
+        const notice = status.textContent;
+        await open(conversationId);
+        if (notice && version + 1 === generation) {
+          status.textContent = [notice, status.textContent].filter(Boolean).join(' ');
+        }
         input.focus();
       }
     }
   }
 
   async function send(question) {
-    if (busy || loading || !conversationId || pending.length) return;
+    if (busy || loading || running || exhausted || !ready || !conversationId || pending.length) return;
     const text = (question ?? input.value).trim();
     if (!text) return;
     input.value = '';
@@ -166,7 +183,7 @@ export function createChat() {
   }
 
   async function decide(approved) {
-    if (busy || loading || !pending.length) return;
+    if (busy || loading || running || !ready || !pending.length) return;
     const type = approved ? 'approve' : 'reject';
     if (pending.some(action => !action.allowed_decisions.includes(type))) return;
     await runTurn({ decisions: pending.map(() => ({ type })) });
@@ -174,9 +191,11 @@ export function createChat() {
 
   function reset() {
     generation++;
+    clearTimeout(pollTimer);
     controller?.abort();
     controller = null;
     busy = loading = false;
+    running = exhausted = ready = false;
     pending = [];
     conversationId = checkpointId = null;
     selector.replaceChildren();

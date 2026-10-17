@@ -3,6 +3,7 @@ import os
 import sys
 import tempfile
 import unittest
+from types import SimpleNamespace
 from pathlib import Path
 from unittest.mock import patch
 
@@ -54,7 +55,9 @@ class ServerSecurityTest(unittest.TestCase):
                                            json={"message": "x" * 4001})
                     self.assertEqual(too_long.status_code, 422)
                     self.assertEqual(too_long.headers["cache-control"], "no-store")
-                    with patch.object(server, "get_web_agent", return_value=object()), \
+                    snapshot = SimpleNamespace(values={}, interrupts=(), config={})
+                    agent = SimpleNamespace(get_state=lambda cfg: snapshot)
+                    with patch.object(server, "get_web_agent", return_value=agent), \
                          patch.object(server, "stream_turn", side_effect=RuntimeError("SECRET_DATABASE_URL")):
                         response = client.post("/api/chat", headers=headers, json={"message": "hi"})
                     self.assertEqual(response.status_code, 200)

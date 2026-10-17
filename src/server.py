@@ -3,16 +3,20 @@
 接口设计:
 - GET  /            → 聊天页面(frontend/index.html)
 - GET  /api/health  → 本机进程健康检查
+- GET/POST /api/conversations → 列出/新建当前用户的会话
+- GET /api/conversations/{id} → 历史、待确认状态、执行状态与额度
 - POST /api/chat    → SSE 流式对话,事件类型:
     token      正常输出的文本增量
     interrupt  HITL 高危工具确认(流到此为止,等用户决定)
     done       本轮结束
     error      本轮出错
+    limit      调用或推理步数达到上限
 - 请求体:
     {"message": "..."}            发新消息
     {"resume": true}              放行上次中断(单个动作)
     {"decisions": [{...}, ...]}   完整决策列表(多动作 / edit)
     身份由 Authorization: Bearer token 解析，不从请求体读取。
+    conversation_id 省略时兼容原有会话；确认恢复必须携带 checkpoint_id。
 
 会话与 HITL 的 Web 化思路(与 CLI 的差异):
 - CLI:input() 阻塞等确认;Web:SSE 流在 interrupt 处断开,
@@ -39,6 +43,7 @@
 import json
 import logging
 import sys
+import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -50,14 +55,16 @@ from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from langgraph.types import Command
+from langgraph.errors import GraphRecursionError
 from pydantic import BaseModel, Field, model_validator
 
 import auth
 from agent.assistant import get_agent
 from agent.conversation_state import conversation_state
 from agent.memory import close_memory
-from agent.runtime import default_thread_id, make_config, setup_langsmith
+from agent.runtime import make_config, setup_langsmith
 from agent.streaming import stream_turn
+from agent.web_runs import EventStream, RunRegistry
 from context import UserContext
 import conversations
 from student_data import (
@@ -102,12 +109,15 @@ async def security_headers(request, call_next):
 # Agent 单例:模型连接、向量库句柄都贵,进程内共享;
 # 会话隔离靠 checkpointer 的 thread_id,不靠多实例
 _agent = None
+_agent_lock = threading.Lock()
+_runs = RunRegistry()
 
 
 def get_web_agent():
     global _agent
-    if _agent is None:
-        _agent = get_agent(with_middleware=True, with_memory=True)
+    with _agent_lock:
+        if _agent is None:
+            _agent = get_agent(with_middleware=True, with_memory=True)
     return _agent
 
 
@@ -248,8 +258,11 @@ def conversation_config(user_id, conversation_id):
 @app.get("/api/conversations/{conversation_id}")
 def conversation_detail(conversation_id: str, user_id: str = Depends(current_user)):
     item = owned_conversation(user_id, conversation_id)
-    state = conversation_state(get_web_agent(), conversation_config(user_id, conversation_id))
-    return {**item, **state}
+    agent = get_web_agent()
+    cfg = conversation_config(user_id, conversation_id)
+    state, running = _runs.snapshot(
+        cfg["configurable"]["thread_id"], lambda: conversation_state(agent, cfg))
+    return {**item, **state, "running": running}
 
 
 def validate_operation(req, state):
@@ -271,7 +284,8 @@ def validate_operation(req, state):
             raise HTTPException(status_code=422, detail="该动作不允许此决定")
         if decision["type"] == "edit":
             edited = decision.get("edited_action", {})
-            if edited.get("name") != action["tool"] or not isinstance(edited.get("args"), dict):
+            if (not isinstance(edited, dict) or edited.get("name") != action["tool"]
+                    or not isinstance(edited.get("args"), dict)):
                 raise HTTPException(status_code=422, detail="修改必须保留工具名并提供参数对象")
 
 
@@ -307,86 +321,81 @@ def _build_inputs(req: ChatRequest):
 @app.post("/api/chat")
 def chat(req: ChatRequest, user_id: str = Depends(current_user)):
     owned_conversation(user_id, req.conversation_id)
-    agent = get_web_agent()
     cfg = conversation_config(user_id, req.conversation_id)
-    validate_operation(req, conversation_state(agent, cfg))
-    user_context = UserContext(user_id=user_id)
+    thread_id = cfg["configurable"]["thread_id"]
+    if not _runs.claim(thread_id):
+        raise HTTPException(status_code=409, detail="该会话正在处理请求，请稍后刷新，或新建会话")
+    try:
+        agent = get_web_agent()
+        state = conversation_state(agent, cfg)
+        validate_operation(req, state)
+        if req.message is not None and state["exhausted"]:
+            raise HTTPException(status_code=429, detail="当前会话额度已用完，请新建会话；原记录仍保留")
+        inputs = _build_inputs(req)
+        if req.message:
+            conversations.name_conversation(user_id, req.conversation_id, req.message)
+    except BaseException:
+        _runs.release(thread_id)
+        raise
 
-    inputs = _build_inputs(req)
-    if inputs is None:
-        return {"error": "message 与 resume / decisions 必须提供其中之一"}
-    if req.message:
-        conversations.name_conversation(user_id, req.conversation_id, req.message)
+    delivery = EventStream()
 
-    def event_stream():
-        # 真流式:旧版把事件攒在 emitted 列表里、stream_turn 跑完才一次性 yield,
-        # 长回答期间连接上几十秒没有字节,容易被浏览器/中间代理判超时断连
-        # (前端就表现为"[连接失败]")。改为队列 + 工作线程,事件边产生边发。
-        import queue
-        import threading
-
-        q: queue.Queue = queue.Queue()
-        _DONE = object()  # 正常结束哨兵
+    def run_turn():
+        saw_interrupt = False
 
         def on_decide(info):
+            nonlocal saw_interrupt
+            saw_interrupt = True
             checkpoint_id = conversation_state(agent, cfg)["checkpoint_id"]
-            for i, action in enumerate(info.action_requests):
-                q.put(
-                    {
-                        "type": "interrupt",
-                        "tool": action.get("name"),
-                        "description": action.get("description", ""),
-                        "args": action.get("args", {}),
-                        # 第08章 §2.2 p16-17:每个动作允许的决策集合,前端据此渲染按钮
-                        "allowed_decisions": info.allowed_decisions(i),
-                        "index": i,
-                        "total": len(info),
-                        # 多动作时前端需要按顺序回传同样数量的 decisions
-                        "requires_all": len(info) > 1,
-                        "checkpoint_id": checkpoint_id,
-                    }
-                )
-            # Web 端 HITL 是"发完 interrupt 就断流",由前端下一次请求恢复,
-            # 返回 None 让 stream_turn 立即收束本轮
+            for index, action in enumerate(info.action_requests):
+                delivery.publish({
+                    "type": "interrupt", "tool": action.get("name"),
+                    "description": action.get("description", ""), "args": action.get("args", {}),
+                    "allowed_decisions": info.allowed_decisions(index),
+                    "index": index, "total": len(info), "requires_all": len(info) > 1,
+                    "checkpoint_id": checkpoint_id,
+                })
             return None
 
-        def on_token(text: str):
-            q.put({"type": "token", "text": text})
+        try:
+            stream_turn(
+                agent, inputs, cfg, on_decide=on_decide,
+                on_token=lambda text: delivery.publish({"type": "token", "text": text}),
+                on_limit=lambda kind: delivery.publish({
+                    "type": "limit", "kind": kind,
+                    "message": "已达到调用上限，请简化问题重试；会话额度耗尽时请新建会话。",
+                }),
+                context=UserContext(user_id=user_id),
+            )
+            final_state = conversation_state(agent, cfg)
+            if not saw_interrupt:
+                delivery.publish({"type": "done", "exhausted": final_state["exhausted"],
+                                  "usage": final_state["usage"]})
+        except GraphRecursionError:
+            delivery.publish({"type": "limit", "kind": "steps",
+                              "message": "本轮推理步数已达上限，请新建会话并简化问题。"})
+        except Exception:
+            logging.exception("chat stream error")
+            delivery.publish({"type": "error", "message": "服务暂时不可用，请稍后刷新会话再试"})
+        finally:
+            # The worker retains ownership even when the browser disconnects.
+            _runs.release(thread_id)
+            delivery.finish()
 
-        def run_turn():
-            try:
-                stream_turn(
-                    agent,
-                    inputs,
-                    cfg,
-                    on_decide=on_decide,
-                    on_token=on_token,
-                    context=user_context,
-                )
-                q.put(_DONE)
-            except Exception as e:  # noqa: BLE001
-                logging.exception("chat stream error")
-                q.put(e)
+    async def event_stream():
+        events = delivery.events()
+        try:
+            async for event in events:
+                yield ": keep-alive\n\n" if event is None else _sse(event)
+        finally:
+            await events.aclose()
 
+    try:
         threading.Thread(target=run_turn, daemon=True).start()
-
-        saw_interrupt = False
-        while True:
-            item = q.get()
-            if item is _DONE:
-                break
-            if isinstance(item, Exception):
-                # 详细异常只写服务端日志，避免 API key、数据库地址等泄漏给浏览器。
-                yield _sse({"type": "error", "message": "服务暂时不可用，请稍后再试"})
-                return
-            saw_interrupt = saw_interrupt or item["type"] == "interrupt"
-            yield _sse(item)
-        # 有中断时不发 done(等用户决定);没有中断则正常收尾
-        if not saw_interrupt:
-            yield _sse({"type": "done"})
-
+    except BaseException:
+        _runs.release(thread_id)
+        raise
     return StreamingResponse(
-        event_stream(),
-        media_type="text/event-stream",
+        event_stream(), media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )

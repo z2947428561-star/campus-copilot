@@ -247,6 +247,63 @@ class ConversationTests(unittest.TestCase):
             reply = stream_turn(agent, {"messages": [HumanMessage("continue")]}, cfg, lambda info: None)
             self.assertIn("结束", reply)
 
+    def test_confirmation_survives_reopening_sqlite_checkpointer(self):
+        from langgraph.checkpoint.sqlite import SqliteSaver
+        from langgraph.graph import StateGraph, MessagesState, START, END
+        from langgraph.types import interrupt, Command
+        from langchain_core.messages import AIMessage, HumanMessage
+        from agent.conversation_state import conversation_state
+
+        def confirm(state):
+            result = interrupt({"action_requests": [{"name": "calculate_gpa", "args": {}}],
+                                "review_configs": [{"allowed_decisions": ["approve", "reject"]}]})
+            return {"messages": [AIMessage("已批准" if result["decisions"][0]["type"] == "approve" else "已拒绝")]}
+
+        graph = StateGraph(MessagesState)
+        graph.add_node("confirm", confirm)
+        graph.add_edge(START, "confirm")
+        graph.add_edge("confirm", END)
+        cfg = {"configurable": {"thread_id": "persisted-confirmation"}}
+        path = str(Path(self.tmp.name) / "restart.db")
+        with SqliteSaver.from_conn_string(path) as saver:
+            agent = graph.compile(checkpointer=saver)
+            agent.invoke({"messages": [HumanMessage("计算 GPA")]}, cfg)
+            before = conversation_state(agent, cfg)
+            self.assertEqual(len(before["pending"]), 1)
+        with SqliteSaver.from_conn_string(path) as saver:
+            agent = graph.compile(checkpointer=saver)
+            restored = conversation_state(agent, cfg)
+            self.assertEqual(restored["checkpoint_id"], before["checkpoint_id"])
+            self.assertEqual(restored["messages"], [{"role": "user", "text": "计算 GPA"}])
+            agent.invoke(Command(resume={"decisions": [{"type": "approve"}]}), cfg)
+            after = conversation_state(agent, cfg)
+            self.assertEqual(after["pending"], [])
+            self.assertEqual(after["messages"][-1], {"role": "assistant", "text": "已批准"})
+
+    def test_detail_does_not_report_idle_for_a_snapshot_read_during_execution(self):
+        from agent.web_runs import RunRegistry
+        registry = RunRegistry()
+        registry.claim("thread")
+        reading, finishing = threading.Event(), threading.Event()
+
+        def finish():
+            reading.wait(5)
+            finishing.set()
+            registry.release("thread")
+
+        def read():
+            reading.set()
+            self.assertTrue(finishing.wait(5))
+            return "snapshot while running"
+
+        with ThreadPoolExecutor() as pool:
+            worker = pool.submit(finish)
+            state, running = registry.snapshot("thread", read)
+            self.assertEqual(state, "snapshot while running")
+            self.assertTrue(running)
+            worker.result(timeout=5)
+        self.assertEqual(registry.snapshot("thread", lambda: "final"), ("final", False))
+
 
 if __name__ == "__main__":
     unittest.main()

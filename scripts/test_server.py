@@ -99,7 +99,7 @@ def main():
     # 越权语义:token 决定身份,请求体无法冒充别人(ChatRequest 已无 user_id 字段)。
     # 只发 user_id 不带 message/resume:既不会被当成身份,也不会被当成输入
     status, data = post_json("/api/chat", {"user_id": "alice"}, token=token)
-    assert status == 200 and "error" in data, f"应被当作空请求拒绝: {status} {data}"
+    assert status == 422, f"应被当作空请求拒绝: {status} {data}"
     print("  √ 请求体塞 user_id 无法冒充他人(字段已移除)")
 
     # 成绩由当前登录用户录入；测试账号明确加载演示数据。
@@ -137,7 +137,9 @@ def main():
     assert not any(e["type"] == "done" for e in ev2), "interrupt 后不应有 done"
 
     print("\n[3/4] resume 放行 → 拿到最终回答")
-    ev3 = post_chat({"resume": True}, token)
+    interrupted = [event for event in ev2 if event["type"] == "interrupt"]
+    ev3 = post_chat({"decisions": [{"type": "approve"} for _ in interrupted],
+                     "checkpoint_id": interrupted[0]["checkpoint_id"]}, token)
     tokens3 = "".join(e.get("text", "") for e in ev3 if e["type"] == "token")
     print(f"  回答(前 100 字): {tokens3[:100]}")
     assert ev3[-1]["type"] == "done", "应以 done 结束"

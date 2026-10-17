@@ -205,19 +205,13 @@ LANGSMITH_PROJECT = _env("LANGSMITH_PROJECT", "campus-copilot")
 #        ModelCallLimitMiddleware / ToolCallLimitMiddleware
 #    它们的计数与图节点数无关,语义更贴近"调用次数"。
 RECURSION_LIMIT = _env_int("RECURSION_LIMIT", 100)
-# 工具调用/模型调用上限(第08章 §3.1 p34、§3.2 p44)
-# ⚠️ 语义实测(课件未讲清,踩过坑):
-#    `thread_limit` 是**按会话累计**的上限,不是"每轮"。它把计数存在
-#    state["thread_model_call_count"] 里,由 checkpointer 持久化,所以
-#    一个 thread 上的多轮对话会累加。一旦触顶且 exit_behavior="end",
-#    该会话后续每一轮都会被**立即结束** —— 实测表现为模型不再输出任何内容、
-#    回答变成空字符串(size=0),而且不报错。
-#    本项目有"持久化多用户会话",长对话很常见:一轮问答通常 2-3 次模型调用,
-#    所以 30 对"一个会话聊 10 轮"就会误伤。这里放宽到 200 作为成本兜底。
-#    单轮的失控保护交给 recursion_limit(见上方说明),
-#    两者分工不同:recursion_limit 管"一次运行跑多久",thread_limit 管"一个会话总共花多少"。
+# 累计限额随检查点持久化；网页触顶后提示新建会话，旧记录仍可查看。
+# 单次执行另设 run_limit；确认恢复算一次新执行，累计计数不会重置。
 TOOL_CALL_THREAD_LIMIT = _env_int("TOOL_CALL_THREAD_LIMIT", 200)
 MODEL_CALL_THREAD_LIMIT = _env_int("MODEL_CALL_THREAD_LIMIT", 200)
+# Each invocation (including confirmation resumes) gets its own bounded budget.
+TOOL_CALL_RUN_LIMIT = max(1, _env_int("TOOL_CALL_RUN_LIMIT", 12))
+MODEL_CALL_RUN_LIMIT = max(1, _env_int("MODEL_CALL_RUN_LIMIT", 12))
 # 摘要触发阈值(第08章 §2.1 p7-11 / 第09章 §2.4.3 p31-34)
 SUMMARY_TRIGGER_MESSAGES = _env_int("SUMMARY_TRIGGER_MESSAGES", 30)
 SUMMARY_TRIGGER_TOKENS = _env_int("SUMMARY_TRIGGER_TOKENS", 24000)
