@@ -17,6 +17,7 @@ CHECKS = (
     "test_server_security.py",
     "test_conversations.py",
     "test_chroma_rebuild.py",
+    "test_policy_evidence.py",
     "test_course_recommendations.py",
 )
 

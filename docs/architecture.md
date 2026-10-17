@@ -78,6 +78,7 @@ SSE 事件类型包括 `token`、`interrupt`、`limit`、`done`、`error`。恢�
 | [`src/tools/timetable.py`](../src/tools/timetable.py) | `find_empty_classrooms`、`query_course_schedule`、`query_my_schedule`：公共排课与个人选课关联 |
 | [`src/tools/gpa.py`](../src/tools/gpa.py) | `calculate_gpa`：读取当前用户成绩并生成结构化 GPA 报告 |
 | [`src/tools/policy.py`](../src/tools/policy.py) | `search_policy`：政策类别过滤与全库召回，整理引用信息 |
+| [`src/policy_evidence.py`](../src/policy_evidence.py) | 来源校验、证据记录与稳定引用 ID；规则与迁移说明见[政策证据](policy-evidence.md) |
 | [`src/tools/profile.py`](../src/tools/profile.py) | `save_profile` / `read_profile`：按用户 namespace 保存和读取画像 |
 | [`src/tools/schemas.py`](../src/tools/schemas.py) | 工具参数的数据契约，供模型调用与运行时校验使用 |
 | [`src/student_data.py`](../src/student_data.py) | 登录用户成绩/选课的存取与课程目录补全 |
@@ -102,6 +103,7 @@ SSE 事件类型包括 `token`、`interrupt`、`limit`、`done`、`error`。恢�
 | `scripts/test_student_data.py`、`test_server_security.py` | 用户隔离、GPA 数据来源、API 边界和页面缓存策略 |
 | `scripts/run_frontend_test_app.py`、`test_frontend.js` | 独立临时账号库的本机浏览器回归；真实 HTTP/检查点、本地假模型，不调用外部模型 |
 | `scripts/test_chroma_rebuild.py` | 本地向量重建检查 |
+| `scripts/test_policy_evidence.py`、`eval_policy.py` | 政策来源、候选过滤、引用与拒答规则；可选固定证据真实模型评测 |
 | `scripts/test_m3.py`、`test_m4.py`、`test_m5.py`、`test_server.py` | 需要模型、数据库或运行中 HTTP 服务的集成验证 |
 | `scripts/eval_m6.py`、`eval_set.json` | 真实模型跑批与固定题目的规则断言 |
 | `scripts/reset_local_password.py` | 本机维护入口：交互重置已有账号密码并撤销旧 token |

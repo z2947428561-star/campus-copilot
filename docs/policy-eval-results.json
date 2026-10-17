@@ -1,0 +1,414 @@
+{
+  "mode": "offline-rule-controls",
+  "generated_at": "2026-10-17T22:28:48.279705+08:00",
+  "passed": 14,
+  "total": 14,
+  "results": [
+    {
+      "id": "summary_supported",
+      "question": "这份快照记载的最低出勤率是多少？",
+      "payload": "snapshot",
+      "answer": "人工整理快照《考勤要求与禁考规定》记载最低出勤率为 80%，时效未核实。[P-067ee44319ab63b5](https://www.xmu.edu.my/sites/default/files/2025-12/Undergraduate-Student-Handbook-2025.pdf)",
+      "expected_pass": true,
+      "model_case": true,
+      "required_any": [
+        "80%",
+        "80％"
+      ],
+      "forbidden": [
+        "90%"
+      ],
+      "evidence_payload": {
+        "schema_version": 1,
+        "status": "evidence_found",
+        "evidence": [
+          {
+            "title": "考勤要求与禁考规定",
+            "source": "https://www.xmu.edu.my/sites/default/files/2025-12/Undergraduate-Student-Handbook-2025.pdf",
+            "source_type": "manual_summary",
+            "collected_at": "unknown",
+            "effective_date": "unknown",
+            "filename": "attendance.md",
+            "section": "Attendance Requirements",
+            "text": "The minimum attendance requirement for each course is 80%.",
+            "id": "P-067ee44319ab63b5",
+            "score": 0.9,
+            "offset_scope": "unknown"
+          }
+        ]
+      },
+      "errors": [],
+      "ok": true
+    },
+    {
+      "id": "exact_quote",
+      "question": "引用这份快照关于出勤率的英文句子。",
+      "payload": "snapshot",
+      "answer": "人工整理快照《考勤要求与禁考规定》（时效未核实）：“The minimum attendance requirement for each course is 80%.” [P-067ee44319ab63b5](https://www.xmu.edu.my/sites/default/files/2025-12/Undergraduate-Student-Handbook-2025.pdf)",
+      "expected_pass": true,
+      "model_case": true,
+      "evidence_payload": {
+        "schema_version": 1,
+        "status": "evidence_found",
+        "evidence": [
+          {
+            "title": "考勤要求与禁考规定",
+            "source": "https://www.xmu.edu.my/sites/default/files/2025-12/Undergraduate-Student-Handbook-2025.pdf",
+            "source_type": "manual_summary",
+            "collected_at": "unknown",
+            "effective_date": "unknown",
+            "filename": "attendance.md",
+            "section": "Attendance Requirements",
+            "text": "The minimum attendance requirement for each course is 80%.",
+            "id": "P-067ee44319ab63b5",
+            "score": 0.9,
+            "offset_scope": "unknown"
+          }
+        ]
+      },
+      "errors": [],
+      "ok": true
+    },
+    {
+      "id": "unknown_id",
+      "question": "出勤率是多少？",
+      "payload": "snapshot",
+      "answer": "人工整理快照，时效未核实：80%。[P-0000000000000000](https://www.xmu.edu.my/sites/default/files/2025-12/Undergraduate-Student-Handbook-2025.pdf)",
+      "expected_pass": false,
+      "expected_errors": [
+        "unknown_citation"
+      ],
+      "evidence_payload": {
+        "schema_version": 1,
+        "status": "evidence_found",
+        "evidence": [
+          {
+            "title": "考勤要求与禁考规定",
+            "source": "https://www.xmu.edu.my/sites/default/files/2025-12/Undergraduate-Student-Handbook-2025.pdf",
+            "source_type": "manual_summary",
+            "collected_at": "unknown",
+            "effective_date": "unknown",
+            "filename": "attendance.md",
+            "section": "Attendance Requirements",
+            "text": "The minimum attendance requirement for each course is 80%.",
+            "id": "P-067ee44319ab63b5",
+            "score": 0.9,
+            "offset_scope": "unknown"
+          }
+        ]
+      },
+      "errors": [
+        "unknown_citation"
+      ],
+      "ok": true
+    },
+    {
+      "id": "wrong_source",
+      "question": "出勤率是多少？",
+      "payload": "snapshot",
+      "answer": "人工整理快照，时效未核实：80%。[P-067ee44319ab63b5](https://www.xmu.edu.my/wrong)",
+      "expected_pass": false,
+      "expected_errors": [
+        "wrong_source"
+      ],
+      "evidence_payload": {
+        "schema_version": 1,
+        "status": "evidence_found",
+        "evidence": [
+          {
+            "title": "考勤要求与禁考规定",
+            "source": "https://www.xmu.edu.my/sites/default/files/2025-12/Undergraduate-Student-Handbook-2025.pdf",
+            "source_type": "manual_summary",
+            "collected_at": "unknown",
+            "effective_date": "unknown",
+            "filename": "attendance.md",
+            "section": "Attendance Requirements",
+            "text": "The minimum attendance requirement for each course is 80%.",
+            "id": "P-067ee44319ab63b5",
+            "score": 0.9,
+            "offset_scope": "unknown"
+          }
+        ]
+      },
+      "errors": [
+        "wrong_source"
+      ],
+      "ok": true
+    },
+    {
+      "id": "changed_quote",
+      "question": "引用出勤率。",
+      "payload": "snapshot",
+      "answer": "人工整理快照，时效未核实：“The minimum attendance requirement for each course is 90%.” [P-067ee44319ab63b5](https://www.xmu.edu.my/sites/default/files/2025-12/Undergraduate-Student-Handbook-2025.pdf)",
+      "expected_pass": false,
+      "expected_errors": [
+        "unsupported_quote"
+      ],
+      "evidence_payload": {
+        "schema_version": 1,
+        "status": "evidence_found",
+        "evidence": [
+          {
+            "title": "考勤要求与禁考规定",
+            "source": "https://www.xmu.edu.my/sites/default/files/2025-12/Undergraduate-Student-Handbook-2025.pdf",
+            "source_type": "manual_summary",
+            "collected_at": "unknown",
+            "effective_date": "unknown",
+            "filename": "attendance.md",
+            "section": "Attendance Requirements",
+            "text": "The minimum attendance requirement for each course is 80%.",
+            "id": "P-067ee44319ab63b5",
+            "score": 0.9,
+            "offset_scope": "unknown"
+          }
+        ]
+      },
+      "errors": [
+        "unsupported_quote"
+      ],
+      "ok": true
+    },
+    {
+      "id": "missing_citation",
+      "question": "出勤率是多少？",
+      "payload": "snapshot",
+      "answer": "人工整理快照记载为 80%，时效未核实。",
+      "expected_pass": false,
+      "expected_errors": [
+        "missing_citation"
+      ],
+      "evidence_payload": {
+        "schema_version": 1,
+        "status": "evidence_found",
+        "evidence": [
+          {
+            "title": "考勤要求与禁考规定",
+            "source": "https://www.xmu.edu.my/sites/default/files/2025-12/Undergraduate-Student-Handbook-2025.pdf",
+            "source_type": "manual_summary",
+            "collected_at": "unknown",
+            "effective_date": "unknown",
+            "filename": "attendance.md",
+            "section": "Attendance Requirements",
+            "text": "The minimum attendance requirement for each course is 80%.",
+            "id": "P-067ee44319ab63b5",
+            "score": 0.9,
+            "offset_scope": "unknown"
+          }
+        ]
+      },
+      "errors": [
+        "missing_citation"
+      ],
+      "ok": true
+    },
+    {
+      "id": "overstated_origin",
+      "question": "出勤率是多少？",
+      "payload": "snapshot",
+      "answer": "官方原文记载为 80%，时效未核实。[P-067ee44319ab63b5](https://www.xmu.edu.my/sites/default/files/2025-12/Undergraduate-Student-Handbook-2025.pdf)",
+      "expected_pass": false,
+      "expected_errors": [
+        "missing_provenance"
+      ],
+      "evidence_payload": {
+        "schema_version": 1,
+        "status": "evidence_found",
+        "evidence": [
+          {
+            "title": "考勤要求与禁考规定",
+            "source": "https://www.xmu.edu.my/sites/default/files/2025-12/Undergraduate-Student-Handbook-2025.pdf",
+            "source_type": "manual_summary",
+            "collected_at": "unknown",
+            "effective_date": "unknown",
+            "filename": "attendance.md",
+            "section": "Attendance Requirements",
+            "text": "The minimum attendance requirement for each course is 80%.",
+            "id": "P-067ee44319ab63b5",
+            "score": 0.9,
+            "offset_scope": "unknown"
+          }
+        ]
+      },
+      "errors": [
+        "missing_provenance"
+      ],
+      "ok": true
+    },
+    {
+      "id": "missing_freshness",
+      "question": "出勤率是多少？",
+      "payload": "snapshot",
+      "answer": "人工整理快照记载为 80%。[P-067ee44319ab63b5](https://www.xmu.edu.my/sites/default/files/2025-12/Undergraduate-Student-Handbook-2025.pdf)",
+      "expected_pass": false,
+      "expected_errors": [
+        "missing_freshness_caveat"
+      ],
+      "evidence_payload": {
+        "schema_version": 1,
+        "status": "evidence_found",
+        "evidence": [
+          {
+            "title": "考勤要求与禁考规定",
+            "source": "https://www.xmu.edu.my/sites/default/files/2025-12/Undergraduate-Student-Handbook-2025.pdf",
+            "source_type": "manual_summary",
+            "collected_at": "unknown",
+            "effective_date": "unknown",
+            "filename": "attendance.md",
+            "section": "Attendance Requirements",
+            "text": "The minimum attendance requirement for each course is 80%.",
+            "id": "P-067ee44319ab63b5",
+            "score": 0.9,
+            "offset_scope": "unknown"
+          }
+        ]
+      },
+      "errors": [
+        "missing_freshness_caveat"
+      ],
+      "ok": true
+    },
+    {
+      "id": "empty_refusal",
+      "question": "2027 年无人机停放违规罚款多少？",
+      "payload": "empty",
+      "expect": "refuse",
+      "answer": "证据不足，无法确认该罚款。请向教务处核实。",
+      "expected_pass": true,
+      "model_case": true,
+      "evidence_payload": {
+        "schema_version": 1,
+        "status": "insufficient_evidence",
+        "evidence": []
+      },
+      "errors": [],
+      "ok": true
+    },
+    {
+      "id": "unavailable_refusal",
+      "question": "学校现在的补考费多少？",
+      "payload": "unavailable",
+      "expect": "refuse",
+      "answer": "检索暂不可用，无法确认费用，请向教务处核实。",
+      "expected_pass": true,
+      "model_case": true,
+      "evidence_payload": {
+        "schema_version": 1,
+        "status": "unavailable",
+        "evidence": []
+      },
+      "errors": [],
+      "ok": true
+    },
+    {
+      "id": "number_after_refusal",
+      "question": "出勤率是多少？",
+      "payload": "empty",
+      "expect": "refuse",
+      "answer": "证据不足，不过最低出勤率是 90%。",
+      "expected_pass": false,
+      "expected_errors": [
+        "unsupported_policy_number"
+      ],
+      "evidence_payload": {
+        "schema_version": 1,
+        "status": "insufficient_evidence",
+        "evidence": []
+      },
+      "errors": [
+        "unsupported_policy_number"
+      ],
+      "ok": true
+    },
+    {
+      "id": "fabricated_process",
+      "question": "没有证据时能否确认免考申请自动通过？",
+      "payload": "empty",
+      "expect": "refuse",
+      "answer": "证据不足，但免考申请自动批准。",
+      "forbidden": [
+        "自动批准"
+      ],
+      "expected_pass": false,
+      "expected_errors": [
+        "forbidden_content"
+      ],
+      "evidence_payload": {
+        "schema_version": 1,
+        "status": "insufficient_evidence",
+        "evidence": []
+      },
+      "errors": [
+        "forbidden_content"
+      ],
+      "ok": true
+    },
+    {
+      "id": "current_policy_unknown",
+      "question": "能否确认这就是目前生效的出勤规定？",
+      "payload": "snapshot",
+      "expect": "refuse",
+      "answer": "快照生效日期未知，无法确认现行要求，请向教务处核实。",
+      "expected_pass": true,
+      "model_case": true,
+      "evidence_payload": {
+        "schema_version": 1,
+        "status": "evidence_found",
+        "evidence": [
+          {
+            "title": "考勤要求与禁考规定",
+            "source": "https://www.xmu.edu.my/sites/default/files/2025-12/Undergraduate-Student-Handbook-2025.pdf",
+            "source_type": "manual_summary",
+            "collected_at": "unknown",
+            "effective_date": "unknown",
+            "filename": "attendance.md",
+            "section": "Attendance Requirements",
+            "text": "The minimum attendance requirement for each course is 80%.",
+            "id": "P-067ee44319ab63b5",
+            "score": 0.9,
+            "offset_scope": "unknown"
+          }
+        ]
+      },
+      "errors": [],
+      "ok": true
+    },
+    {
+      "id": "partial_coverage",
+      "question": "快照记载的出勤率是多少，以及补考费多少？",
+      "payload": "snapshot",
+      "expect": "partial",
+      "answer": "人工整理快照《考勤要求与禁考规定》记载出勤率为 80%，时效未核实。[P-067ee44319ab63b5](https://www.xmu.edu.my/sites/default/files/2025-12/Undergraduate-Student-Handbook-2025.pdf)\n\n补考费用未覆盖，无法确认，请咨询教务处。",
+      "expected_pass": true,
+      "model_case": true,
+      "required_any": [
+        "80%",
+        "80％"
+      ],
+      "forbidden": [
+        "RM 100",
+        "100 马币"
+      ],
+      "evidence_payload": {
+        "schema_version": 1,
+        "status": "evidence_found",
+        "evidence": [
+          {
+            "title": "考勤要求与禁考规定",
+            "source": "https://www.xmu.edu.my/sites/default/files/2025-12/Undergraduate-Student-Handbook-2025.pdf",
+            "source_type": "manual_summary",
+            "collected_at": "unknown",
+            "effective_date": "unknown",
+            "filename": "attendance.md",
+            "section": "Attendance Requirements",
+            "text": "The minimum attendance requirement for each course is 80%.",
+            "id": "P-067ee44319ab63b5",
+            "score": 0.9,
+            "offset_scope": "unknown"
+          }
+        ]
+      },
+      "errors": [],
+      "ok": true
+    }
+  ]
+}

@@ -245,6 +245,26 @@ class AnswerEvaluationTests(unittest.TestCase):
         self.assertTrue(any(row["expected_pass"] for row in results))
         self.assertTrue(any(not row["expected_pass"] for row in results))
 
+    def test_model_mode_uses_current_prompt_and_fixed_tool_evidence(self):
+        from types import SimpleNamespace
+        from langchain_core.messages import AIMessage
+        from eval_policy import load_cases, run_model
+        cases = {c["question"]: c for c in load_cases() if c.get("model_case")}
+        fake = Mock()
+
+        def respond(messages):
+            self.assertIn("manual_summary", messages[0].content)
+            self.assertEqual(messages[-1].name, "search_policy")
+            self.assertIn("status", json.loads(messages[-1].content))
+            return AIMessage(content=cases[messages[1].content]["answer"])
+
+        fake.invoke.side_effect = respond
+        with patch.dict(sys.modules, {"model": SimpleNamespace(get_chat_model=lambda: fake)}), \
+             patch.dict(os.environ):
+            rows = run_model()
+        self.assertEqual(fake.invoke.call_count, 6)
+        self.assertTrue(all(row["ok"] for row in rows), rows)
+
 
 if __name__ == "__main__":
     unittest.main()
