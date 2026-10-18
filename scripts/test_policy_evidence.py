@@ -88,6 +88,8 @@ class EvidenceGateTests(unittest.TestCase):
                 return [[.6, .8] for _ in texts]
 
             def embed_query(self, text):
+                if text == "Minimum attendance is 80%.":
+                    return [.6, .8]
                 return [1., 0.]
 
         kb = policy.kb

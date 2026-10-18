@@ -14,6 +14,7 @@ import re
 import auth
 import storage
 import config
+import kb_releases
 import semesters
 
 logger = logging.getLogger("campus")
@@ -194,19 +195,25 @@ def catalog(user_id):
 
 
 def index_page(q, offset, size):
+    version = kb_releases.snapshot(include_releases=False)
+    active = version["active"]
+    name = active["collection"]
+    publication = {"generation": active["generation"], "revision": version["revision"],
+                   "state": active["state"], "created_at": active.get("created_at"),
+                   "previous_generation": (version["previous"] or {}).get("generation")}
     if config.KB_BACKEND == "chroma":
-        path = Path(config.CHROMA_DIR)
+        path = kb_releases.absolute_path(config.CHROMA_DIR)
         if not (path / "chroma.sqlite3").is_file():
             raise StoreUnavailable("尚未发现本机 Chroma 索引；可先查看政策快照。")
         import chromadb
         client = chromadb.PersistentClient(path=str(path))
-        collection = client.get_collection(config.MILVUS_COLLECTION, embedding_function=None)
+        collection = client.get_collection(name, embedding_function=None)
         args = {"where_document": {"$contains": q}} if q else {}
         result = collection.get(limit=size + 1, offset=offset, include=["documents", "metadatas"], **args)
         rows = [{**(meta or {}), "id": key, "text": text or ""} for key, meta, text in
                 zip(result["ids"], result["metadatas"], result["documents"])]
         return rows[:size], None if q else collection.count(), len(rows) > size, {
-            "backend": "Chroma", "collection": config.MILVUS_COLLECTION,
+            **publication, "backend": "Chroma", "collection": name,
             "metric": (collection.metadata or {}).get("hnsw:space", "unknown"),
         }
     if config.KB_BACKEND != "milvus":
@@ -214,7 +221,7 @@ def index_page(q, offset, size):
     from pymilvus import MilvusClient
     client = MilvusClient(uri=config.MILVUS_URI, db_name=config.MILVUS_DB_NAME, timeout=4)
     try:
-        description = client.describe_collection(config.MILVUS_COLLECTION, timeout=4)
+        description = client.describe_collection(name, timeout=4)
         fields = {f["name"]: f for f in description.get("fields", [])}
         if "text" not in fields:
             raise StoreUnavailable("目标集合没有政策正文字段，无法显示分块。")
@@ -222,15 +229,15 @@ def index_page(q, offset, size):
         output = [n for n in requested if n in fields or description.get("enable_dynamic_field")]
         pattern = q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         expression = "text like " + json.dumps("%" + pattern + "%", ensure_ascii=False) if q else ""
-        counts = client.query(config.MILVUS_COLLECTION, filter=expression, output_fields=["count(*)"], timeout=4)
+        counts = client.query(name, filter=expression, output_fields=["count(*)"], timeout=4, consistency_level="Strong")
         total = int(counts[0]["count(*)"])
-        rows = client.query(config.MILVUS_COLLECTION, filter=expression, output_fields=output,
-                            limit=size, offset=offset, timeout=4)
+        rows = client.query(name, filter=expression, output_fields=output,
+                            limit=size, offset=offset, timeout=4, consistency_level="Strong")
         # Some driver versions nest dynamic metadata under $meta.
         rows = [{**(r.get("$meta") or {}), **r} for r in rows]
         vector = fields.get("vector", {})
         return rows, total, offset + len(rows) < total, {
-            "backend": "Milvus", "collection": config.MILVUS_COLLECTION,
+            **publication, "backend": "Milvus", "collection": name,
             "dimension": vector.get("params", {}).get("dim"),
         }
     finally:

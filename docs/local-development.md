@@ -54,7 +54,7 @@ python scripts/build_kb.py
 python -m uvicorn src.server:app --host 127.0.0.1 --port 8000
 ```
 
-这是新克隆的初始化顺序。`init_db.py` 会删除并重建 `data/campus.db` 中的公共表；`build_kb.py` 会重建当前配置指向的向量集合。两者都应在确认目标和保留必要数据后运行，日常启动无需重复执行。
+这是新克隆的初始化顺序。`init_db.py` 会删除并重建 `data/campus.db` 中的公共表；`build_kb.py` 会写入独立候选集合，验收后切换并保留旧版。已有数据先确认目标与备份，日常启动无需重复执行。分步发布、状态查询与回滚见[存储说明](storage.md)。
 
 浏览器访问 [本机页面](http://127.0.0.1:8000/)，API 文档位于 [Swagger UI](http://127.0.0.1:8000/docs)。`/api/health` 只证明 Web 进程可响应，不检查模型额度、向量库可用性或回答质量。
 

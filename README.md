@@ -103,7 +103,7 @@ python -m uvicorn src.server:app --host 127.0.0.1 --port 8000
 
 浏览器打开 [http://127.0.0.1:8000/](http://127.0.0.1:8000/)，先注册再登录。用户名为 3 位大写专业缩写 + 7 位数字；密码至少 8 位，同时包含字母和数字。请通过这个地址访问页面。
 
-`init_db.py` 会重建公共种子库，`build_kb.py` 会重建向量索引；已有数据时先阅读[本地开发说明](docs/local-development.md)。未配置模型和索引时可以查看页面、使用账号功能，但完整对话与政策检索不可用。
+`init_db.py` 会重建公共种子库；`build_kb.py` 会构建独立索引、验证后切换并保留旧版。已有数据时先阅读[本地开发说明](docs/local-development.md)和[安全发布与回滚](docs/storage.md)。未配置模型和索引时可以查看页面、使用账号功能，但完整对话与政策检索不可用。
 
 已有 Conda `.venv` 环境的 Windows 用户可继续使用 `run_web.cmd`；它要求解释器位于 `.venv\python.exe`，与标准 venv 的目录布局不同。PostgreSQL / Milvus 的接入方式也见[本地开发说明](docs/local-development.md)。
 

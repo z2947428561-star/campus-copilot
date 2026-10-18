@@ -27,8 +27,10 @@
      自带标题路径,缓解"片段脱离上下文"。
 
 运行(项目根目录):.venv\\python scripts\\build_kb.py
-可重复执行:每次清空重建 collection。
+可重复执行：写入新版本，验证后原子切换；旧集合保留，可回滚。
 """
+import argparse
+import json
 import re
 import sys
 from pathlib import Path
@@ -133,7 +135,7 @@ def split_documents(docs, metadatas):
     return chunks
 
 
-def build():
+def build(*, stage_only=False, batch_size=64):
     docs, metadatas = load_markdown_docs()
     if not docs:
         print(
@@ -157,35 +159,49 @@ def build():
         f"接近上限的 {capped} 个)"
     )
 
-    # 清空重建,保证脚本可重复执行(第10章 p53-54:先 drop 再 create)
+    # 候选集合完全独立；所有批次与校验完成前不改变生效指针。
     print(f"\n后端:{config.KB_BACKEND} / 度量:{config.MILVUS_METRIC} / 维度:{config.EMBED_DIM}")
-    # 在删除旧索引前先验证云端/本地 Embedding，避免缺 key、余额不足等
-    # 确定性故障导致旧知识库被清空。建库过程仍需维护窗口与备份。
-    probe = kb.get_embeddings().embed_query("知识库构建前检查")
-    if len(probe) != config.EMBED_DIM:
-        raise RuntimeError(f"Embedding 维度不匹配: expected={config.EMBED_DIM}, actual={len(probe)}")
-    vs = kb.get_vectorstore(fresh=True)
-    if vs is None:
-        print(
-            "\n[失败] 向量库不可用。请检查:\n"
-            "  - .env 的 EMBED_API_KEY 是否已配置\n"
-            f"  - KB_BACKEND={config.KB_BACKEND} 对应的服务是否已启动\n"
-            f"    (请启动配置的本机 Milvus，或选择 KB_BACKEND=chroma；URI={config.MILVUS_URI})"
-        )
-        sys.exit(1)
+    result = kb.build_index(chunks, publish=not stage_only, batch_size=batch_size)
+    print(json.dumps({"result": "staged" if stage_only else "published", "release": result,
+                      "revision": kb.index_status()["revision"]}, ensure_ascii=False, indent=2))
+    return result
 
-    # Milvus 的 schema 已由 kb.py 建好,这里只需把文本交给 LangChain 嵌入并写入。
-    # 为兼容两种后端,统一走 add_documents(LangChain 底层会调 embedding_function)。
-    ids = vs.add_documents(chunks)
-    print(f"已写入 {len(ids)} 个片段 → {config.KB_BACKEND}")
 
-    # 自检:预热 embedding 并做一次示例检索(第10章 p63-66 的验证思路)
-    hits = vs.similarity_search_with_relevance_scores("补考和重修的区别", k=3)
-    print("\n自检检索「补考和重修的区别」Top3:")
-    for doc, score in hits:
-        title = doc.metadata.get("title", "?")
-        print(f"  [{score:.3f}] {title} | {doc.page_content[:50]}...")
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="构建候选政策索引、检查状态、发布或回滚")
+    action = parser.add_mutually_exclusive_group()
+    action.add_argument("--status", action="store_true", help="只读发布记录，不连接向量库或模型")
+    action.add_argument("--stage-only", action="store_true", help="构建并验证，但不切换生效版本")
+    action.add_argument("--publish", metavar="GENERATION", help="发布已验证的候选版本")
+    action.add_argument("--rollback", action="store_true", help="切回上一生效版本")
+    parser.add_argument("--expected-revision", type=int, help="发布/回滚必须提供刚确认的修订号")
+    parser.add_argument("--batch-size", type=int, default=64)
+    args = parser.parse_args(argv)
+    if args.publish or args.rollback:
+        if args.expected_revision is None or args.expected_revision < 0:
+            parser.error("发布或回滚需要 --expected-revision 非负整数")
+    elif args.expected_revision is not None:
+        parser.error("--expected-revision 只适用于 --publish 或 --rollback")
+    try:
+        if args.status:
+            result = kb.index_status()
+        elif args.publish:
+            result = kb.publish_index(args.publish, expected_revision=args.expected_revision)
+        elif args.rollback:
+            result = kb.rollback_index(expected_revision=args.expected_revision)
+        else:
+            build(stage_only=args.stage_only, batch_size=args.batch_size)
+            return 0
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0
+    except kb.releases.PublicationConflict as exc:
+        print(f"[发布冲突] {exc}。运行 --status 确认后再指定修订号。", file=sys.stderr)
+        return 1
+    except Exception as exc:
+        # Driver exceptions can contain connection credentials; don't echo them.
+        print(f"[失败] {type(exc).__name__}。请检查后端、Embedding 配置和 --status；详见 docs/storage.md。", file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":
-    build()
+    raise SystemExit(main())

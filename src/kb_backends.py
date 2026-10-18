@@ -120,7 +120,8 @@ class Reader:
                                  search_params={"metric_type": "COSINE", "params": {}})[0]
         output = []
         for hit in hits:
-            entity = dict(hit["entity"])
+            raw = hit["entity"]
+            entity = {**(raw.get("$meta") or {}), **raw}
             text = entity.pop("text", "")
             entity.pop("vector", None)
             output.append((Document(page_content=text, metadata=entity), float(hit["distance"])))

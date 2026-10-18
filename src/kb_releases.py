@@ -82,7 +82,7 @@ def _release(conn, generation, target):
     return dict(row)
 
 
-def snapshot():
+def snapshot(*, include_releases=True):
     target = scope()
     if not absolute_path(config.KB_REGISTRY_PATH).exists():
         return {"revision": 0, "active": {"generation": "legacy", "collection": config.MILVUS_COLLECTION,
@@ -92,7 +92,7 @@ def snapshot():
         active = _release(conn, head["active"] if head else "legacy", target)
         previous = _release(conn, head["previous"], target) if head and head["previous"] else None
         releases = [dict(row) for row in conn.execute(
-            "SELECT * FROM kb_releases WHERE scope=? ORDER BY created_at DESC", (target,))]
+            "SELECT * FROM kb_releases WHERE scope=? ORDER BY created_at DESC", (target,))] if include_releases else []
     return {"revision": head["revision"] if head else 0, "active": active,
             "previous": previous, "releases": releases}
 

@@ -229,6 +229,8 @@ async function loadTable() {
     if (selection.source === 'index') {
       const info = data.info;
       el('index-note').textContent = `${info.backend} 集合：${info.collection}` + (info.dimension ? `，实际向量维度：${info.dimension}` : '')
+        + (info.generation ? (info.generation === 'legacy' ? '。旧版索引，尚无构建记录' : `。生效修订：${info.revision}，版本：${info.generation.slice(0, 8)}`) : '')
+        + (info.created_at ? `，构建时间：${info.created_at}` : '')
         + '。仅浏览存储的分块；旧数据的来源类型或日期可能为空。';
       el('index-note').hidden = false;
     }

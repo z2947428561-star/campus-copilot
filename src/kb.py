@@ -1,7 +1,7 @@
 """Knowledge-base embedding, immutable builds and version-aware read access."""
 import logging
+import math
 import threading
-from pathlib import Path
 
 import config
 import kb_backends as backend
@@ -128,7 +128,8 @@ def build_index(documents, *, publish=True, batch_size=64):
         probe = documents[0]
         hits = backend.Reader(name, embeddings).similarity_search_with_score(probe.page_content, k=5)
         if not any(d.page_content == probe.page_content and all(d.metadata.get(k) == v for k, v in probe.metadata.items())
-                   for d, _ in hits):
+                   and math.isfinite(score) and (.99 <= score <= 1.00001 if is_milvus() else -.00001 <= score <= .01)
+                   for d, score in hits):
             raise ValueError("Index text/metadata self-query validation failed")
         releases.mark(candidate["generation"], "ready")
     except Exception:
@@ -171,7 +172,7 @@ def get_vectorstore(fresh=False):
         raise ValueError("fresh=True was removed; use build_index() for safe publication")
     with _lock:
         try:
-            state = index_status()
+            state = releases.snapshot(include_releases=False)
             active = state["active"]
             contract = releases.embedding_contract()
             if active["generation"] != "legacy" and active["embedding"] != contract:

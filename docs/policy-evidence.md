@@ -56,8 +56,8 @@ Milvus 返回余弦相似度，Chroma 返回余弦距离，工具统一换算为
 准备更新本机知识库时，在项目根目录按以下顺序操作：
 
 1. 确认公开快照内容、来源和待使用的向量后端。
-2. 运行 `.venv\python.exe scripts/build_kb.py`；此命令会清空目标集合再重建，并可能调用云端 Embedding。
-3. 重启 Web/CLI 进程，让缓存的向量库连接重新初始化。
+2. 运行 `.venv\python.exe scripts/build_kb.py --stage-only`；此命令构建独立候选集合，并可能调用云端 Embedding。
+3. 按[安全发布说明](storage.md)检查状态、发布候选；Web/CLI 下一次检索自动发现切换，无需重启。
 4. 检查 `search_policy` 返回的来源类型和日期，再使用真实问题校准阈值。
 
 `archive_docs.py` 只在需要恢复内置快照时运行；它会覆盖那 16 个同名文件，不会抓取新政策。

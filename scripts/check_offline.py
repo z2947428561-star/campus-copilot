@@ -22,6 +22,7 @@ CHECKS = (
     "test_semesters.py",
     "test_semester_data.py",
     "test_semester_context.py",
+    "test_storage.py",
     "test_course_recommendations.py",
 )
 

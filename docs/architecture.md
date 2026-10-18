@@ -42,7 +42,8 @@ SSE 事件类型包括 `token`、`interrupt`、`limit`、`done`、`error`。恢�
 | 会话归属、标题、创建时间 | PostgreSQL 账号库 | SQLite 账号库 | `src/conversations.py` |
 | 会话状态、人工确认中断现场 | PostgreSQL Checkpointer | SQLite Checkpointer | `src/agent/memory.py` |
 | 长期用户画像 | PostgreSQL Store | SQLite Store | `src/agent/memory.py`、`src/tools/profile.py` |
-| 政策向量与片段元数据 | Milvus | Chroma 本地目录 | `src/kb.py`、`scripts/build_kb.py` |
+| 政策向量与片段元数据 | Milvus | Chroma 本地目录 | `src/kb.py`、`src/kb_backends.py` |
+| 政策索引发布登记 | 本机 SQLite | — | `src/kb_releases.py`，见[安全发布](storage.md) |
 | 政策快照和公共种子数据 | Git 跟踪的 Markdown / JSON | — | `data/raw_docs/`、`data/structured/` |
 
 `MEMORY_BACKEND` 同时影响账号、个人数据和记忆层；更换它或 `DATABASE_URL` **不会迁移旧账号**。这能解释“换了配置之后原账号登录不了”的一种情形。
@@ -89,6 +90,7 @@ SSE 事件类型包括 `token`、`interrupt`、`limit`、`done`、`error`。恢�
 | --- | --- |
 | `frontend/index.html`、`frontend/css/app.css`、`frontend/js/` | 页面结构、样式与原生浏览器模块；后端通过 `/assets/` 提供静态资源，模块职责见[前端说明](frontend.md) |
 | `src/conversations.py`、`src/agent/conversation_state.py`、`src/agent/web_runs.py` | 会话登记与归属、检查点展示投影、单进程执行互斥与有界事件队列 |
+| `src/storage.py` | 个人 SQL 连接、事务、后端占位符和绝对路径；鉴权、个人数据与会话共用 |
 | `src/semesters.py`、`scripts/import_semester.py`、`frontend/js/semester.js` | 学期登记、保留旧数据的迁移、版本导入与共用选择；见[多学期说明](semesters.md) |
 | `src/prompts/common.py`、`discipline.py`、`system.py`、`__init__.py` | 公共约束、政策引用与行为规则、系统提示词的组合入口 |
 | `src/messages.py` | 消息结构的公共构造方法 |
@@ -103,7 +105,7 @@ SSE 事件类型包括 `token`、`interrupt`、`limit`、`done`、`error`。恢�
 | `scripts/test_auth_*.py`、`test_reset_local_password.py` | 注册、登录、限流、旧账号兼容和重置验证 |
 | `scripts/test_student_data.py`、`test_server_security.py` | 用户隔离、GPA 数据来源、API 边界和页面缓存策略 |
 | `scripts/run_frontend_test_app.py`、`test_frontend.js` | 独立临时账号库的本机浏览器回归；真实 HTTP/检查点、本地假模型，不调用外部模型 |
-| `scripts/test_chroma_rebuild.py` | 本地向量重建检查 |
+| `scripts/test_chroma_rebuild.py`、`scripts/test_storage.py` | 候选索引、切换与回滚；SQL 事务和并发更新检查 |
 | `src/database_browser.py`、`frontend/database.html`、`frontend/js/database.js` | 受鉴权的只读数据投影与可视化；公共表、当前账号记录、政策文件和向量索引，见[使用说明](database-browser.md) |
 | `scripts/test_policy_evidence.py`、`eval_policy.py` | 政策来源、候选过滤、引用与拒答规则；可选固定证据真实模型评测 |
 | `scripts/test_m3.py`、`test_m4.py`、`test_m5.py`、`test_server.py` | 需要模型、数据库或运行中 HTTP 服务的集成验证 |

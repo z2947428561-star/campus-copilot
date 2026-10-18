@@ -81,11 +81,13 @@ async page => {
   await page.route('**/api/database/index/chunks?*', route => route.fulfill({ json: {
     source: 'index', table: 'chunks', label: '已入库分块', page: 1, page_size: 10, total: 1, has_more: false, sortable: false,
     columns: [{ name: 'id', label: '记录 ID', type: 'ID', primary: true }, { name: 'text', label: '分块正文', type: 'TEXT', primary: false }],
-    rows: [{ id: 3, text: malicious }], info: { backend: '测试索引', collection: 'isolated_test', dimension: 1024 },
+    rows: [{ id: 3, text: malicious }], info: { backend: '测试索引', collection: 'isolated_test', dimension: 1024,
+      generation: 'abcdef0123456789', revision: 7, created_at: '2026-10-18T00:00:00+00:00' },
   } }));
   await page.locator('#db-retry').click();
   await ready();
   ensure((await page.locator('#db-table tbody').textContent()).includes(malicious), 'Index row missing');
+  ensure((await page.locator('#db-index-note').textContent()).includes('生效修订：7，版本：abcdef01'), 'Published revision missing');
   ensure(await page.locator('#db-table img').count() === 0, 'Table interpreted stored text as HTML');
   await page.getByRole('button', { name: '查看记录 1', exact: true }).click();
   ensure(await page.locator('#db-detail img').count() === 0, 'Detail interpreted stored text as HTML');
