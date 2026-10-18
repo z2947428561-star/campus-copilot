@@ -68,6 +68,7 @@ from agent.web_runs import EventStream, RunRegistry
 from context import UserContext
 import conversations
 import database_browser
+import semesters
 from student_data import (
     delete_course, delete_grade, init_student_data, list_courses, list_grades,
     set_course, set_grade,
@@ -149,10 +150,12 @@ class GradeRequest(BaseModel):
     course_id: str
     grade_point: float = Field(ge=0, le=4, allow_inf_nan=False)
     letter: str = Field(min_length=1, max_length=8)
+    semester_id: str | None = Field(default=None, max_length=120)
 
 
 class CourseRequest(BaseModel):
     course_id: str
+    semester_id: str | None = Field(default=None, max_length=120)
 
 
 def current_user(authorization: str = Header(default="")) -> str:
@@ -190,41 +193,65 @@ def logout(authorization: str = Header(default="")):
     return {"ok": True}
 
 
+def requested_term(semester_id=None):
+    try:
+        return semesters.resolve_semester(semester_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/semesters")
+def semester_catalog(user_id: str = Depends(current_user)):
+    terms = semesters.list_semesters()
+    try:
+        default = semesters.resolve_semester()["semester_id"]
+    except ValueError:
+        default = None
+    today = semesters.campus_today().isoformat()
+    keys = ("semester_id", "label", "academic_year", "start_date", "end_date", "version", "schedule_status", "is_demo")
+    return {"semesters": [{**{k: t[k] for k in keys}, "is_current": t["start_date"] <= today <= t["end_date"]}
+                          for t in terms], "default_id": default}
+
+
 @app.get("/api/me/grades")
-def my_grades(user_id: str = Depends(current_user)):
-    return {"grades": list_grades(user_id)}
+def my_grades(user_id: str = Depends(current_user), semester_id: str | None = Query(default=None, max_length=120)):
+    term = requested_term(semester_id)
+    return {"grades": list_grades(user_id, term["semester_id"]), "semester_id": term["semester_id"], "semester": term["label"]}
 
 
 @app.put("/api/me/grades")
 def save_my_grade(req: GradeRequest, user_id: str = Depends(current_user)):
     try:
-        return set_grade(user_id, req.course_id, req.grade_point, req.letter)
+        return set_grade(user_id, req.course_id, req.grade_point, req.letter, req.semester_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @app.delete("/api/me/grades/{course_id}")
-def remove_my_grade(course_id: str, user_id: str = Depends(current_user)):
-    delete_grade(user_id, course_id)
+def remove_my_grade(course_id: str, user_id: str = Depends(current_user), semester_id: str | None = Query(default=None, max_length=120)):
+    term = requested_term(semester_id)
+    delete_grade(user_id, course_id, term["semester_id"])
     return {"ok": True}
 
 
 @app.get("/api/me/courses")
-def my_courses(user_id: str = Depends(current_user)):
-    return {"courses": list_courses(user_id)}
+def my_courses(user_id: str = Depends(current_user), semester_id: str | None = Query(default=None, max_length=120)):
+    term = requested_term(semester_id)
+    return {"courses": list_courses(user_id, term["semester_id"]), "semester_id": term["semester_id"], "semester": term["label"]}
 
 
 @app.put("/api/me/courses")
 def save_my_course(req: CourseRequest, user_id: str = Depends(current_user)):
     try:
-        return set_course(user_id, req.course_id)
+        return set_course(user_id, req.course_id, req.semester_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @app.delete("/api/me/courses/{course_id}")
-def remove_my_course(course_id: str, user_id: str = Depends(current_user)):
-    delete_course(user_id, course_id)
+def remove_my_course(course_id: str, user_id: str = Depends(current_user), semester_id: str | None = Query(default=None, max_length=120)):
+    term = requested_term(semester_id)
+    delete_course(user_id, course_id, term["semester_id"])
     return {"ok": True}
 
 

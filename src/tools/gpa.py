@@ -27,6 +27,7 @@ from pydantic import BaseModel, Field
 
 from context import UserContext
 from student_data import list_grades
+from semesters import selected_semester
 
 logger = logging.getLogger("campus")
 
@@ -57,8 +58,11 @@ class GpaReport(BaseModel):
     advice: str = Field(description="针对当前绩点的改进建议,中文一句话")
 
 
-def _load_grades(user_id: str) -> list[CourseGrade]:
-    rows = list_grades(user_id)
+def _load_grades(user_id: str, semester_id: str | None = None) -> list[CourseGrade]:
+    return _grade_models(list_grades(user_id, semester_id))
+
+
+def _grade_models(rows):
     missing = [row["course_id"] for row in rows if row["credits"] <= 0]
     if missing:
         raise ValueError(f"课程目录缺少 {', '.join(missing)}，无法准确计算 GPA")
@@ -73,8 +77,11 @@ def _load_grades(user_id: str) -> list[CourseGrade]:
         "注意:这是个人敏感数据,执行前会请求用户确认。"
     ),
 )
-def calculate_gpa(runtime: ToolRuntime[UserContext]) -> str:
+def calculate_gpa(runtime: ToolRuntime[UserContext], semester_id: str = "") -> str:
     """计算本学期加权 GPA 并生成分析报告。
+
+    Args:
+        semester_id: 明确的学期 ID；留空使用当前运行上下文中的选择。
 
     Returns:
         分析报告的 JSON 字符串(ok/total_credits/weighted_gpa/strongest/
@@ -84,13 +91,16 @@ def calculate_gpa(runtime: ToolRuntime[UserContext]) -> str:
     if not user_id:
         return _dump({"ok": False, "error": "缺少用户身份，无法读取个人成绩"})
     try:
-        grades = _load_grades(user_id)
+        term = selected_semester(semester_id, runtime)
+        raw_grades = list_grades(user_id, term["semester_id"])
+        grades = _grade_models(raw_grades)
     except Exception as e:  # 第05章 §6.3(p42-43) 第 1 层防护:工具内兜住异常
         logger.error("[GPA] 读取成绩失败: %r", e)
         return _dump({"ok": False, "error": f"读取成绩数据失败:{e}"})
 
     if not grades:
-        return _dump({"ok": False, "error": "你尚未录入本学期成绩；可在网页的个人数据中录入"})
+        return _dump({"ok": False, "semester_id": term["semester_id"], "semester": term["label"],
+                      "error": "你尚未录入所选学期成绩；可在网页的个人数据中录入"})
 
     total = sum(g.credits for g in grades)
     gpa = round(sum(g.grade_point * g.credits for g in grades) / total, 2)
@@ -124,12 +134,15 @@ def calculate_gpa(runtime: ToolRuntime[UserContext]) -> str:
     # 工具内写长期记忆的示范(第09章 §3.3.1 p52-56 / §4.2 p74-80)。
     # store 未挂载或 context 缺失时不影响主流程,但**不静默**:
     # 第09章 §4.2(p77)的示范是 logger.error + 返回失败标志。
-    _remember_latest_gpa(runtime, report)
+    _remember_latest_gpa(runtime, report, term)
 
-    return _dump({"ok": True, **report.model_dump()})
+    warnings = (["部分旧成绩未保存历史学分，使用当前课程目录学分；历史 GPA 未完全核实。"]
+                if any(g["credits_source"] == "current_catalog" for g in raw_grades) else [])
+    return _dump({"ok": True, "semester_id": term["semester_id"], "semester": term["label"],
+                  "warnings": warnings, **report.model_dump()})
 
 
-def _remember_latest_gpa(runtime: ToolRuntime[UserContext], report: GpaReport) -> None:
+def _remember_latest_gpa(runtime: ToolRuntime[UserContext], report: GpaReport, term: dict) -> None:
     """把本次 GPA 结果写进长期画像(失败只记日志,不拦正事)。"""
     store = runtime.store
     if store is None or runtime.context is None:
@@ -145,7 +158,7 @@ def _remember_latest_gpa(runtime: ToolRuntime[UserContext], report: GpaReport) -
             "latest_gpa",
             {
                 "value": (
-                    f"{report.weighted_gpa}({report.level}),"
+                    f"{term['label']} [{term['semester_id']}] {report.weighted_gpa}({report.level}),"
                     f"最弱 {report.weakest.course_id} {report.weakest.letter}"
                 )
             },

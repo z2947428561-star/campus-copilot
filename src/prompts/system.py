@@ -20,13 +20,14 @@ from prompts.discipline import (
     CITATION_DISCIPLINE,
     MEMORY_DISCIPLINE,
     TOOL_DISCIPLINE,
+    SEMESTER_DISCIPLINE,
 )
 
 # 固定值集中一处:第04章 §2.4.1(p37-38)的"部分变量预填充"
 FIXED_VARS = {
     "school": "厦门大学马来西亚分校(XMUM)",
     "tool_routing": (
-        "教学周 / 考试时间→get_academic_week;"
+        "已录入学期→list_available_semesters;教学周 / 考试时间→get_academic_week;"
         "空教室→find_empty_classrooms;课程上课时间→query_course_schedule;"
         "用户自己的课表→query_my_schedule;"
         "绩点分析→calculate_gpa;课程信息与先修→query_course;"
@@ -53,6 +54,7 @@ def build_prompt(
 
     # 工具纪律只在真的有工具时才有意义(裸 Agent 场景不注入)
     parts.append(TOOL_DISCIPLINE)
+    parts.append(SEMESTER_DISCIPLINE)
     if with_memory:
         parts.append(MEMORY_DISCIPLINE)
     if with_rag:

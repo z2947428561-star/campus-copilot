@@ -82,7 +82,7 @@ class SemesterDataTest(unittest.TestCase):
             response = self.client.put("/api/me/courses", headers=self.alice,
                 json={"course_id": "CS101", "semester_id": term})
             self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(self.student.list_courses("AAA2509001", "2026-09")[0]["sessions"]), 2)
+        self.assertEqual(len(self.student.list_courses("AAA2509001", "2026-09")[0]["sessions"]), 4)
         self.assertEqual(len(self.student.list_courses("AAA2509001", "2027-04")[0]["sessions"]), 1)
 
     def test_unknown_semester_is_rejected_and_legacy_name_is_accepted(self):

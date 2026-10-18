@@ -75,9 +75,10 @@ class EmptyClassroomInput(BaseModel):
     week_no: int = Field(
         default=1,
         ge=1,
-        le=14,
-        description="目标教学周次,范围 1-14(默认第 1 周)。部分课程只在 6-14 周开课",
+        le=54,
+        description="目标教学周次；工具会按所选学期实际已录入周数校验，默认第 1 周",
     )
+    semester_id: str = Field(default="", max_length=120, description="学期 ID；留空使用运行上下文所选学期，可先调用 list_available_semesters")
 
 
 class PolicySearchInput(BaseModel):
@@ -98,10 +99,10 @@ class AcademicWeekInput(BaseModel):
     date_str: str = Field(
         default="",
         description=(
-            "要查询的日期,格式 YYYY-MM-DD。留空表示查询今天。"
-            "用户说「今天/明天/现在」时留空即可,系统按当天计算"
+            "要查询的日期，格式 YYYY-MM-DD。留空查询校园今天；查询明天等其他日期时须传入该日期"
         ),
     )
+    semester_id: str = Field(default="", max_length=120, description="明确限定的学期 ID；显式日期默认按日期匹配已录入学期")
 
 
 class CourseQueryInput(BaseModel):

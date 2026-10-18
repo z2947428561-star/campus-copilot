@@ -33,3 +33,4 @@ class UserContext:
     """
 
     user_id: str
+    semester_id: str | None = None
