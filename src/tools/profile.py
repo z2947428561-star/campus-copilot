@@ -32,6 +32,7 @@ logger = logging.getLogger("campus")
 # 第09章 §3.1.3(p40):namespace 是 tuple 层级路径,用于分组与隔离。
 # key 用字段名(grade/major/interests/...),比"整个 dict 一个 key"更抗并发覆盖。
 NAMESPACE_ROOT = "profiles"
+_PROFILE_PAGE_SIZE = 100
 
 
 def _dump(payload: dict) -> str:
@@ -98,7 +99,7 @@ def save_profile(key: str, value: str, runtime: ToolRuntime[UserContext]) -> str
     ),
 )
 def read_profile(runtime: ToolRuntime[UserContext]) -> str:
-    """读取当前用户的全部长期画像字段。
+    """逐页读取当前用户的全部长期画像字段。
 
     Returns:
         画像内容的 JSON 字符串(ok/user/profile);画像为空时 profile 为空对象,
@@ -111,6 +112,14 @@ def read_profile(runtime: ToolRuntime[UserContext]) -> str:
         return _dump({"ok": False, "error": err})
 
     user_id = runtime.context.user_id
-    items = store.search(_namespace(user_id))
-    profile = {item.key: (item.value or {}).get("value") for item in items}
+    namespace = _namespace(user_id)
+    profile = {}
+    offset = 0
+    # search 默认只返回 10 条；显式分页直到读完，不为完整画像设置总条数上限。
+    while True:
+        items = store.search(namespace, limit=_PROFILE_PAGE_SIZE, offset=offset)
+        profile.update({item.key: (item.value or {}).get("value") for item in items})
+        if len(items) < _PROFILE_PAGE_SIZE:
+            break
+        offset += len(items)
     return _dump({"ok": True, "user": user_id, "profile": profile})
