@@ -7,15 +7,18 @@
 ```text
 frontend/
 ├── index.html
+├── database.html
 ├── css/
-│   └── app.css
+│   ├── app.css
+│   └── database.css
 └── js/
     ├── app.js
     ├── api.js
     ├── session.js
     ├── auth.js
     ├── chat.js
-    └── student-data.js
+    ├── student-data.js
+    └── database.js
 ```
 
 ## 一个一个怎么读
@@ -30,6 +33,7 @@ frontend/
 | 6 | [auth.js](../frontend/js/auth.js) | 登录/注册校验、按钮忙碌状态、登录区域显示与退出请求；真正的身份校验仍在 Python 后端 |
 | 7 | [chat.js](../frontend/js/chat.js) | 会话选择与新建、历史和待确认恢复、流式更新及限额反馈；重置时丢弃旧请求结果 |
 | 8 | [student-data.js](../frontend/js/student-data.js) | 个人数据面板、课程/成绩列表和增删操作；重置时取消请求并清空个人数据界面 |
+| 9 | [database.js](../frontend/js/database.js) | 独立数据浏览器入口；共用 API 与会话模块，提供表格、字段、关联及详情，账号变化时取消请求并清理数据 |
 
 功能模块通过小接口交给 `app.js` 协调，不相互导入。HTTP 和 SSE 只在 `api.js` 实现，存储键只在 `session.js` 管理；新增功能不应复制请求或 token 处理。动态消息和数据用文本节点渲染，不能把模型回复或课程字段当 HTML 插入。
 
@@ -45,7 +49,7 @@ frontend/
 python scripts/run_frontend_test_app.py
 ```
 
-脚本固定监听 `127.0.0.1:18765`，跳过 `.env`，使用临时 SQLite 保存账号和个人数据，关闭追踪；Agent 使用本地确定性假模型、虚构 GPA 工具与临时 SQLite 检查点。不会修改日常账号库、公共课程库或读取原始经验表；正常退出后清理临时数据库。
+脚本固定监听 `127.0.0.1:18765`，跳过 `.env`，使用临时 SQLite 保存账号和个人数据，并从公开种子创建临时校园库，关闭追踪；Agent 使用本地确定性假模型、虚构 GPA 工具与临时 SQLite 检查点。不会修改日常账号库、公共课程库或读取原始经验表；正常退出后清理临时数据库。
 
 第二个终端运行浏览器检查：
 
@@ -66,3 +70,9 @@ playwright-cli -s=frontend-migration close
 顶部会话选择器在手机和桌面都可用。当前选择按用户名保存在 sessionStorage，各标签页可以独立选择。
 刷新时从后端恢复检查点保留的消息和待确认动作；后台仍运行时自动刷新状态。
 会话额度耗尽后保留记录并显示新建入口。详细协议与限制见[会话生命周期](conversations.md)。
+
+## 数据浏览器
+
+聊天页右上角“数据浏览器”打开 `/database`，功能和验证见[数据库可视化说明](database-browser.md)。
+与聊天页面共用 token 和请求模块，独立 JavaScript 入口不创建 Agent。
+追加浏览器检查命令为 `playwright-cli -s=campus-database run-code --filename=scripts/test_database_browser.js`。

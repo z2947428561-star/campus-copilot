@@ -103,6 +103,7 @@ SSE 事件类型包括 `token`、`interrupt`、`limit`、`done`、`error`。恢�
 | `scripts/test_student_data.py`、`test_server_security.py` | 用户隔离、GPA 数据来源、API 边界和页面缓存策略 |
 | `scripts/run_frontend_test_app.py`、`test_frontend.js` | 独立临时账号库的本机浏览器回归；真实 HTTP/检查点、本地假模型，不调用外部模型 |
 | `scripts/test_chroma_rebuild.py` | 本地向量重建检查 |
+| `src/database_browser.py`、`frontend/database.html`、`frontend/js/database.js` | 受鉴权的只读数据投影与可视化；公共表、当前账号记录、政策文件和向量索引，见[使用说明](database-browser.md) |
 | `scripts/test_policy_evidence.py`、`eval_policy.py` | 政策来源、候选过滤、引用与拒答规则；可选固定证据真实模型评测 |
 | `scripts/test_m3.py`、`test_m4.py`、`test_m5.py`、`test_server.py` | 需要模型、数据库或运行中 HTTP 服务的集成验证 |
 | `scripts/eval_m6.py`、`eval_set.json` | 真实模型跑批与固定题目的规则断言 |

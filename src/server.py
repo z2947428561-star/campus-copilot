@@ -51,7 +51,7 @@ from pathlib import Path
 # agent/ tools/ 等兄弟包会找不到 —— 先把本文件所在目录塞进去
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from langgraph.types import Command
@@ -67,6 +67,7 @@ from agent.streaming import stream_turn
 from agent.web_runs import EventStream, RunRegistry
 from context import UserContext
 import conversations
+import database_browser
 from student_data import (
     delete_course, delete_grade, init_student_data, list_courses, list_grades,
     set_course, set_grade,
@@ -102,7 +103,7 @@ async def security_headers(request, call_next):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"
-    if request.url.path == "/" or request.url.path.startswith(("/api/", "/assets/")):
+    if request.url.path in {"/", "/database"} or request.url.path.startswith(("/api/", "/assets/")):
         response.headers["Cache-Control"] = "no-store"
     return response
 
@@ -292,6 +293,32 @@ def validate_operation(req, state):
 @app.get("/")
 def index():
     return FileResponse(FRONTEND_DIR / "index.html")
+
+
+@app.get("/database")
+def database_page():
+    return FileResponse(FRONTEND_DIR / "database.html")
+
+
+@app.get("/api/database")
+def database_catalog(user_id: str = Depends(current_user)):
+    return database_browser.catalog(user_id)
+
+
+@app.get("/api/database/{source}/{table}")
+def database_table(source: str, table: str, user_id: str = Depends(current_user),
+                   q: str = Query(default="", max_length=120), page: int = Query(default=1, ge=1, le=10000),
+                   page_size: int = Query(default=25, ge=1, le=100),
+                   sort: str = Query(default="", max_length=64), direction: str = Query(default="asc", pattern="^(asc|desc)$")):
+    try:
+        return database_browser.table_page(source, table, user_id, q=q, page=page,
+                                            page_size=page_size, sort=sort, direction=direction)
+    except database_browser.MissingTable as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except database_browser.StoreUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 @app.get("/api/health")

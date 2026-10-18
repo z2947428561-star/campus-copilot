@@ -132,6 +132,7 @@ GitHub Actions 只做代码检查，不部署应用；运行隔离的离线测�
 | [本机基础设施](ops/README.md) | 已有 PostgreSQL / Milvus 的本机端口绑定与数据保留注意事项 |
 | [数据说明](docs/data-plan.md) | 公开文档快照、演示种子数据及尚未接入的真实数据 |
 | [选课经验](docs/course-recommendations.md) | 本机 Excel 导入、经验搜索与原始评价查询、来源与隐私边界 |
+| [数据浏览器](docs/database-browser.md) | 本机数据库表、字段、关联与政策向量分块的可视化入口 |
 | [政策证据与评测](docs/policy-evidence.md) | 来源类型、证据门槛、旧索引迁移与引用/拒答评测 |
 | [评估记录](docs/eval-results.md) | 固定测试集的历史结果与评估口径 |
 | [课程对照](docs/course-map.md) | 尚硅谷 LangChain 课程学习内容与代码落点 |

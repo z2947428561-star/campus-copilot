@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>数据浏览器 · Campus Copilot</title>
+  <link rel="stylesheet" href="/assets/css/app.css">
+  <link rel="stylesheet" href="/assets/css/database.css">
+</head>
+<body class="db-body">
+  <header class="db-header">
+    <a class="db-brand" href="/" aria-label="Campus Copilot 首页"><span class="brand-mark" aria-hidden="true">厦</span><span>Campus Copilot</span></a>
+    <span class="db-header-name">数据浏览器</span>
+    <div class="db-header-actions"><span id="db-user"></span><a href="/">返回对话</a></div>
+  </header>
+  <main id="db-gate" class="db-gate" hidden>
+    <span class="db-gate-symbol" aria-hidden="true">数</span>
+    <h1>登录后浏览校园数据</h1>
+    <p id="db-gate-message">使用当前账号查看课程、教室、政策，以及你自己的记录。</p>
+    <a class="db-primary" href="/">前往登录</a>
+  </main>
+  <div id="db-app" class="db-shell" hidden>
+    <aside class="db-sidebar" aria-label="数据目录">
+      <div class="db-sidebar-head"><h1>数据目录</h1><span class="db-readonly">只读</span></div>
+      <p class="db-sidebar-intro">从一张表，了解一条记录。</p>
+      <details id="db-directory" open><summary>选择数据表</summary><nav id="db-sources" aria-label="数据来源与表"></nav></details>
+      <p class="db-sidebar-foot">个人记录仅限当前账号。<br>校园排课包含演示数据。</p>
+    </aside>
+    <main class="db-workspace" aria-label="数据库内容">
+      <div class="db-heading">
+        <div><p id="db-context" class="db-context">正在读取目录</p><h2 id="db-title">数据浏览器</h2><p id="db-description"></p></div>
+        <button type="button" id="db-refresh" class="db-secondary">刷新数据</button>
+      </div>
+      <div class="db-workbar"><nav class="db-tabs" aria-label="查看方式">
+        <button type="button" data-view="records" aria-pressed="true">数据记录</button>
+        <button type="button" data-view="schema" aria-pressed="false">字段结构</button>
+        <button type="button" data-view="relations" aria-pressed="false">表间关系</button>
+      </nav><span id="db-count" class="db-count"></span></div>
+      <p id="db-status" role="status" aria-live="polite"></p>
+      <section id="db-error" class="db-error" role="alert" hidden><h3>暂时无法读取</h3><p id="db-error-message"></p><button type="button" id="db-retry" class="db-secondary">重试</button></section>
+      <section id="db-records" aria-label="数据记录">
+        <form id="db-search-form" class="db-search">
+          <label class="sr-only" for="db-query">搜索当前数据表</label>
+          <input type="search" id="db-query" placeholder="搜索当前表中的内容…" maxlength="120" autocomplete="off">
+          <button type="submit" class="db-primary">搜索</button><button type="button" id="db-clear" class="db-secondary">清空</button>
+          <label class="db-page-size" for="db-page-size">每页 <select id="db-page-size"><option>10</option><option selected>25</option><option>50</option><option>100</option></select> 条</label>
+        </form>
+        <div class="db-table-wrap" tabindex="0" role="region" aria-label="数据表，可横向滚动"><table id="db-table"><caption class="sr-only">当前数据表</caption><thead></thead><tbody></tbody></table></div>
+        <div id="db-empty" class="db-empty" hidden><h3>这里还没有记录</h3><p id="db-empty-message"></p></div>
+        <footer class="db-pagination"><span id="db-range"></span><div><button type="button" id="db-prev" class="db-secondary" disabled>上一页</button><span id="db-page">第 1 页</span><button type="button" id="db-next" class="db-secondary" disabled>下一页</button></div></footer>
+      </section>
+      <section id="db-schema" aria-label="字段结构" hidden><p class="db-section-note">以下为浏览器可见字段；账号隔离字段由服务端处理。</p><div class="db-table-wrap"><table><caption class="sr-only">可见字段定义</caption><thead><tr><th scope="col">字段</th><th scope="col">含义</th><th scope="col">类型</th><th scope="col">标识</th></tr></thead><tbody id="db-schema-rows"></tbody></table></div></section>
+      <section id="db-relations" aria-label="表间关系" hidden><p class="db-section-note">外键来自校园库定义；跨数据源的逻辑与来源关联单独标明。</p><div id="db-relation-list"></div></section>
+      <p id="db-index-note" class="db-section-note" hidden></p>
+    </main>
+  </div>
+  <dialog id="db-detail" aria-labelledby="db-detail-title"><div class="db-detail-head"><div><p>记录详情</p><h2 id="db-detail-title"></h2></div><button type="button" id="db-detail-close" class="db-secondary" aria-label="关闭记录详情">关闭</button></div><dl id="db-detail-fields"></dl></dialog>
+  <script type="module" src="/assets/js/database.js"></script>
+</body>
+</html>

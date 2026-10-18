@@ -21,8 +21,15 @@ def main() -> None:
     })
     with tempfile.TemporaryDirectory(prefix="campus-browser-") as tmp:
         os.environ["MEMORY_DB_PATH"] = str(Path(tmp) / "memory.db")
+        os.environ["KB_BACKEND"] = "chroma"
+        os.environ["CHROMA_DIR"] = str(Path(tmp) / "missing-chroma")
+        from browser_fixtures import create_catalog
+        catalog_path = Path(tmp) / "campus.db"
+        create_catalog(catalog_path)
         import uvicorn
         from src import server
+        import student_data
+        student_data.CATALOG_DB = catalog_path
         from fake_chat_agent import build_agent
 
         server._agent = build_agent()
