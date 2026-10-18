@@ -1,53 +1,17 @@
-"""知识库访问层:Embedding + 向量库的统一入口。
-
-课程对应:
-    第10章 §2.4.1(p47)    模型选型表(bge-m3:多语言 / 1024 维 / 8192 序列长度)
-    第10章 §2.4.2(p48-49) Embedding 走 OpenAI 兼容云端网关
-    第10章 §2.5.2(p52)    向量库选型
-    第10章 §2.5.3(p52-62) Milvus 完整用法:create_database → use_database →
-                          create_collection(dimension=1024, metric_type="COSINE")
-    第01章 §5.1(p18-19)   RAG 四个难点:文件解析 / 文件切割 / 知识检索 / 知识重排序
-
-为什么单独抽一个模块(旧版的问题):
-    旧版 policy.py 与 build_kb.py 各自维护一份向量库初始化代码,而且用的是
-    OllamaEmbeddings + Chroma。按课件应改成云端 embedding + Milvus 之后,
-    再写两份必然会漂移。这里把"怎么连向量库"收敛到一处,建库与检索共用。
-
-**迁移状态(重要,不要误读)**:
-    课件第10章用 Milvus,所以 KB_BACKEND 默认就是 "milvus";
-    Milvus 需要 Docker 或 WSL2。本机已验证 Milvus；在尚未启动 Milvus 的环境中,
-    把 .env 的 KB_BACKEND 设为 "chroma" 可沿用旧的本地 Chroma 库过渡 ——
-    两边 LangChain 接口同构,只改 .env 一处,建库与检索会一起切换。
-
-几个必须记住的踩坑点(实测得到,不是猜的):
-1) Milvus 的元数据过滤参数是 **expr 字符串表达式**(如 'doc_type == "exam"'),
-   不是 Chroma 那种字典 filter。所以检索层要按后端分支处理。
-2) langchain-milvus 的 `_select_relevance_score_fn` 会**读取 index_params 里的
-   metric_type** 来决定分数归一化方式;不传 index_params 会退化成 L2 口径并打
-   警告。所以这里必须显式传 index_params(metric_type=COSINE),
-   归一化才是 (score+1)/2 —— 与课件 p53 的 COSINE 口径一致。
-3) Milvus 的 `similarity_search*` 不收字典 filter,只收 expr;而
-   `similarity_search_with_relevance_scores` 把它 kwargs 透传下去,
-   所以传 expr=... 是可行的。
-"""
+"""Knowledge-base embedding, immutable builds and version-aware read access."""
 import logging
 import threading
 from pathlib import Path
 
 import config
+import kb_backends as backend
+import kb_releases as releases
 
 logger = logging.getLogger("campus")
 
 _vectorstore = None
+_cache_key = None
 _lock = threading.Lock()
-
-# 索引参数:必须显式给出 metric_type,否则相关性分数会退化成 L2 口径
-_MILVUS_INDEX_PARAMS = {
-    "index_type": "AUTOINDEX",
-    "metric_type": config.MILVUS_METRIC,
-    "params": {},
-}
-
 
 # ---------------------------------------------------------------- Embedding
 def get_embeddings():
@@ -134,175 +98,109 @@ def embedding_backend_desc() -> str:
     return f"cloud:{config.EMBED_MODEL}"
 
 
-# ---------------------------------------------------------------- Milvus(课件默认后端)
-def _ensure_milvus_collection(fresh: bool = False) -> None:
-    """确保 database 与 collection 存在(第10章 §2.5.3 p53-54)。
+def index_status():
+    """Read publication metadata without connecting to vectors or an embedding service."""
+    return releases.snapshot()
 
-    维度按 config.EMBED_DIM(默认 1024),度量按 config.MILVUS_METRIC(默认 COSINE),
-    与课件 `create_collection(dimension=1024, metric_type="COSINE")` 一致。
 
-    ⚠️ 实测踩坑:MilvusClient 的"当前库"是有状态的 ——
-        `use_database()` 之后同一个 client 的后续操作才落在目标库;
-        而**新构造一个 client 默认连的是 `default` 库**。
-        所以验证/排查时若直接 `MilvusClient(uri=...)` 然后 `list_collections()`,
-        会看到空列表并误判"collection 没建成功"。
-        排查请用 `MilvusClient(uri=..., db_name=...)`。
-        (本函数内部用 use_database 是正确的,已实测 collection 落在 MILVUS_DB_NAME 里;
-         最后加一次断言把这个不变量固定下来,避免以后被改坏。)
-    """
-    from pymilvus import DataType, MilvusClient
-
-    client = MilvusClient(uri=config.MILVUS_URI)
+def build_index(documents, *, publish=True, batch_size=64):
+    """Build an isolated candidate; any failure preserves the active collection."""
+    documents = list(documents)
+    if not documents or any(not d.page_content.strip() for d in documents):
+        raise ValueError("A non-empty corpus is required")
+    if not isinstance(batch_size, int) or not 1 <= batch_size <= 256:
+        raise ValueError("Batch size must be between 1 and 256")
+    if config.MILVUS_METRIC.upper() != "COSINE":
+        raise ValueError("Policy indexes require COSINE")
+    candidate = releases.begin(documents)
+    name = candidate["collection"]
     try:
-        if config.MILVUS_DB_NAME not in client.list_databases():
-            client.create_database(db_name=config.MILVUS_DB_NAME)
-        client.use_database(db_name=config.MILVUS_DB_NAME)
-
-        exists = client.has_collection(collection_name=config.MILVUS_COLLECTION)
-        if exists and not fresh:
-            return
-        if exists:
-            client.drop_collection(collection_name=config.MILVUS_COLLECTION)
-
-        schema = MilvusClient.create_schema(auto_id=True, enable_dynamic_field=True)
-        schema.add_field("id", DataType.INT64, is_primary=True)
-        schema.add_field("vector", DataType.FLOAT_VECTOR, dim=config.EMBED_DIM)
-        schema.add_field("text", DataType.VARCHAR, max_length=8192)
-        # ⚠️ 实测教训:collection 里**声明过的**字段,插入的每一行都必须给值,
-        #    否则报 `Insert missed an field X ... without set nullable==true`。
-        #    langchain-milvus 的行结构就是 `{"text":..., "vector":..., **metadata}`,
-        #    所以这里既要把字段声明全(nullable=True 兜底),也要在 build_kb.py 里
-        #    保证每个 chunk 的 metadata 都带上这些键。
-        #    其余元数据(h1/h2/start_index 等)走 enable_dynamic_field 作为动态字段。
-        for name, max_len in (
-            ("title", 512),
-            ("source", 1024),
-            ("doc_type", 64),
-            ("filename", 256),
-        ):
-            schema.add_field(name, DataType.VARCHAR, max_length=max_len, nullable=True)
-        schema.add_field("chunk_id", DataType.INT64, nullable=True)
-
-        index_params = client.prepare_index_params()
-        index_params.add_index(
-            field_name="vector",
-            index_type=_MILVUS_INDEX_PARAMS["index_type"],
-            metric_type=_MILVUS_INDEX_PARAMS["metric_type"],
-        )
-        client.create_collection(
-            collection_name=config.MILVUS_COLLECTION,
-            schema=schema,
-            index_params=index_params,
-        )
-
-        # 自检:确认 collection 真的落在了目标库(而不是 default)—— 见上面踩坑说明
-        if not client.has_collection(collection_name=config.MILVUS_COLLECTION):
-            raise RuntimeError(
-                f"Milvus collection 创建后校验失败:"
-                f"db={config.MILVUS_DB_NAME} collection={config.MILVUS_COLLECTION}"
-            )
-
-        logger.info(
-            "[知识库] 已创建 Milvus collection=%s db=%s dim=%s metric=%s",
-            config.MILVUS_COLLECTION,
-            config.MILVUS_DB_NAME,
-            config.EMBED_DIM,
-            config.MILVUS_METRIC,
-        )
-    finally:
-        client.close()
+        embeddings = get_embeddings()
+        backend.create_collection(name)
+        for offset in range(0, len(documents), batch_size):
+            batch = documents[offset:offset + batch_size]
+            vectors = backend.checked_vectors(embeddings.embed_documents([d.page_content for d in batch]), len(batch))
+            backend.add(name, batch, vectors, offset)
+        backend.finish(name)
+        backend.check_collection(name)
+        if backend.count(name) != len(documents):
+            raise ValueError("Index chunk count validation failed")
+        probe = documents[0]
+        hits = backend.Reader(name, embeddings).similarity_search_with_score(probe.page_content, k=5)
+        if not any(d.page_content == probe.page_content and all(d.metadata.get(k) == v for k, v in probe.metadata.items())
+                   for d, _ in hits):
+            raise ValueError("Index text/metadata self-query validation failed")
+        releases.mark(candidate["generation"], "ready")
+    except Exception:
+        releases.mark(candidate["generation"], "failed")
+        raise
+    if publish:
+        publish_index(candidate["generation"], expected_revision=candidate["base_revision"])
+    return next(r for r in index_status()["releases"] if r["generation"] == candidate["generation"])
 
 
-def _build_milvus(fresh: bool = False):
-    from langchain_milvus import Milvus
-
-    _ensure_milvus_collection(fresh=fresh)
-    return Milvus(
-        embedding_function=get_embeddings(),
-        collection_name=config.MILVUS_COLLECTION,
-        connection_args={"uri": config.MILVUS_URI, "db_name": config.MILVUS_DB_NAME},
-        auto_id=True,
-        primary_field="id",
-        text_field="text",
-        vector_field="vector",
-        # The server schema already enables dynamic metadata; the client must too,
-        # otherwise langchain-milvus silently discards provenance when inserting.
-        enable_dynamic_field=True,
-        # 关键:显式给 metric_type,相关性分数才按 COSINE 归一化(见模块 docstring 第 2 点)
-        index_params=_MILVUS_INDEX_PARAMS,
-    )
+def publish_index(generation, *, expected_revision):
+    status = index_status()
+    release = next((r for r in status["releases"] if r["generation"] == generation), None)
+    if not release or release["state"] != "ready" or release["embedding"] != releases.embedding_contract():
+        raise ValueError("Release is not ready or embedding configuration differs")
+    backend.check_collection(release["collection"])
+    if backend.count(release["collection"]) != release["chunk_count"]:
+        raise ValueError("Candidate collection changed or is incomplete")
+    return releases.switch(generation, expected_revision)
 
 
-# ---------------------------------------------------------------- Chroma(过渡用)
-def _build_chroma(fresh: bool = False):
-    """旧的本地 Chroma 库(仅在 KB_BACKEND=chroma 时使用,过渡期)。
+def rollback_index(*, expected_revision):
+    previous = index_status()["previous"]
+    if previous is None:
+        raise ValueError("There is no previous release")
+    if previous["generation"] == "legacy":
+        backend.check_collection(previous["collection"])
+        return releases.switch("legacy", expected_revision)
+    return publish_index(previous["generation"], expected_revision=expected_revision)
 
-    修掉了旧版的一个真 bug:旧版建库时没指定距离度量,chromadb 默认 l2,
-    导致 similarity_search_with_relevance_scores 走欧氏距离换算口径,
-    对外展示的"相关度"与课件第10章 p53 的 COSINE 不是一回事。
-    这里显式指定 hnsw:space=cosine。
-    (注意:距离度量创建后不可更改,所以旧的 Chroma 目录需要重建。)
+
+def get_vectorstore(fresh=False):
+    """Attach read-only to the current version. Missing/invalid index returns None.
+
+    Each call rechecks the small local pointer; an already-running query keeps its
+    collection. Destructive ``fresh=True`` is rejected before any storage access.
     """
-    from langchain_chroma import Chroma
-
-    store = Chroma(
-        collection_name=config.MILVUS_COLLECTION,
-        embedding_function=get_embeddings(),
-        persist_directory=str(Path(config.CHROMA_DIR)),
-        collection_metadata={"hnsw:space": "cosine"},
-    )
-    if not fresh and (store._collection.metadata or {}).get("hnsw:space") != "cosine":
-        raise ValueError("Existing Chroma index is not COSINE; rebuild it before policy retrieval")
+    global _vectorstore, _cache_key
     if fresh:
-        store.delete_collection()
-        store = Chroma(
-            collection_name=config.MILVUS_COLLECTION,
-            embedding_function=get_embeddings(),
-            persist_directory=str(Path(config.CHROMA_DIR)),
-            collection_metadata={"hnsw:space": "cosine"},
-        )
-    return store
-
-
-# ---------------------------------------------------------------- 统一入口
-def get_vectorstore(fresh: bool = False):
-    """懒加载向量库(进程内缓存;失败返回 None,不抛异常)。
-
-    返回 None 时调用方(policy.py)给出"知识库未接入"的诚实提示,
-    而不是让 Agent 崩 —— 这也是 build_kb.py 能用它做"建库前先清空"的原因。
-    """
-    global _vectorstore
-    if _vectorstore is not None and not fresh:
-        return _vectorstore
+        raise ValueError("fresh=True was removed; use build_index() for safe publication")
     with _lock:
-        if _vectorstore is not None and not fresh:
-            return _vectorstore
         try:
-            if config.KB_BACKEND == "milvus":
-                _vectorstore = _build_milvus(fresh=fresh)
-            else:
-                _vectorstore = _build_chroma(fresh=fresh)
-        except Exception as e:  # noqa: BLE001
-            logger.warning("[知识库] 初始化失败(backend=%s): %r", config.KB_BACKEND, e)
+            state = index_status()
+            active = state["active"]
+            contract = releases.embedding_contract()
+            if active["generation"] != "legacy" and active["embedding"] != contract:
+                raise ValueError("Published index embedding configuration differs; rebuild before retrieval")
+            key = (releases.scope(), state["revision"], active["collection"], contract)
+            if _vectorstore is not None and key == _cache_key:
+                return _vectorstore
+            backend.check_collection(active["collection"])
+            _vectorstore = backend.Reader(active["collection"], get_embeddings())
+            _cache_key = key
+            return _vectorstore
+        except Exception as exc:
+            _vectorstore = _cache_key = None
+            logger.warning("[知识库] 只读连接失败 backend=%s error=%s", config.KB_BACKEND, type(exc).__name__)
             return None
-    return _vectorstore
 
 
-def reset_cache() -> None:
-    """清掉进程内缓存(建库脚本重跑后用)。"""
-    global _vectorstore
-    _vectorstore = None
+def reset_cache():
+    global _vectorstore, _cache_key
+    with _lock:
+        _vectorstore = _cache_key = None
 
 
-def is_milvus() -> bool:
+def is_milvus():
     return config.KB_BACKEND == "milvus"
 
 
-def metadata_expr(doc_type: str) -> str:
-    """把 doc_type 转成 Milvus 的 expr 表达式。
+def metadata_expr(doc_type):
+    import json
+    return "doc_type == " + json.dumps(doc_type, ensure_ascii=False)
 
-    Milvus 用字符串表达式过滤(实测签名里的参数叫 expr),
-    与 Chroma 的字典 filter={"doc_type": ...} 不同。
-    """
-    safe = doc_type.replace('"', "")
-    return f'doc_type == "{safe}"'
+

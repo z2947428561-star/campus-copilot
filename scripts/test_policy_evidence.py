@@ -70,14 +70,6 @@ class ProvenanceTests(unittest.TestCase):
 
 
 class EvidenceGateTests(unittest.TestCase):
-    def test_milvus_client_preserves_dynamic_provenance(self):
-        import langchain_milvus
-        with patch.object(policy.kb, "_ensure_milvus_collection"), \
-             patch.object(policy.kb, "get_embeddings"), \
-             patch.object(langchain_milvus, "Milvus") as constructor:
-            policy.kb._build_milvus()
-        self.assertTrue(constructor.call_args.kwargs["enable_dynamic_field"])
-
     def test_milvus_nested_metadata_after_reconnect(self):
         doc = Document(page_content="Minimum attendance is 80%.", metadata={"$meta": sample_doc().metadata})
         store = Mock()
@@ -102,18 +94,18 @@ class EvidenceGateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp, \
              patch.object(kb.config, "KB_BACKEND", "chroma"), \
              patch.object(kb.config, "CHROMA_DIR", tmp), \
+             patch.object(kb.config, "KB_REGISTRY_PATH", str(Path(tmp) / "releases.db")), \
+             patch.object(kb.config, "EMBED_DIM", 2), \
              patch.object(kb.config, "MILVUS_COLLECTION", "policy_evidence_test"), \
              patch.object(kb, "get_embeddings", return_value=Vectors()):
             kb.reset_cache()
-            store = kb.get_vectorstore(fresh=True)
             try:
-                store.add_documents([sample_doc()])
+                kb.build_index([sample_doc()])
                 result = json.loads(policy.search_policy.invoke({"query": "考勤"}))
                 self.assertEqual(result["status"], "evidence_found")
                 self.assertAlmostEqual(result["evidence"][0]["score"], .8, places=5)
             finally:
                 kb.reset_cache()
-                del store
                 from chromadb.api.client import SharedSystemClient
                 SharedSystemClient.clear_system_cache()
                 gc.collect()

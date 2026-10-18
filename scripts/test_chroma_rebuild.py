@@ -58,6 +58,91 @@ class ChromaPublicationTest(unittest.TestCase):
         self.assertEqual(self.current_text(), "old handbook")
         self.assertEqual(kb.index_status()["active"]["generation"], first["generation"])
 
+    def test_staged_publish_and_rollback_refresh_existing_reader(self):
+        first = kb.build_index(docs("old handbook"))
+        reader = kb.get_vectorstore()
+        candidate = kb.build_index(docs("new handbook"), publish=False)
+        self.assertEqual(self.current_text(), "old handbook")
+        kb.publish_index(candidate["generation"], expected_revision=1)
+        self.assertEqual(self.current_text(), "new handbook")
+        self.assertEqual(reader.similarity_search_with_score("old", k=1)[0][0].page_content, "old handbook")
+        rolled = kb.rollback_index(expected_revision=2)
+        self.assertEqual(rolled["revision"], 3)
+        self.assertEqual(rolled["active"]["generation"], first["generation"])
+        self.assertEqual(self.current_text(), "old handbook")
+
+    def test_concurrent_candidates_cannot_overwrite_newer_publication(self):
+        kb.build_index(docs("old handbook"))
+        a = kb.build_index(docs("new A"), publish=False)
+        b = kb.build_index(docs("new B"), publish=False)
+        kb.publish_index(a["generation"], expected_revision=1)
+        with self.assertRaises(kb.releases.PublicationConflict):
+            kb.publish_index(b["generation"], expected_revision=1)
+        self.assertEqual(self.current_text(), "new A")
+
+    def test_missing_index_read_and_status_do_not_create_storage(self):
+        self.assertEqual(kb.index_status()["revision"], 0)
+        self.assertIsNone(kb.get_vectorstore())
+        self.assertFalse(Path(kb.config.CHROMA_DIR).exists())
+        self.assertFalse(Path(kb.config.KB_REGISTRY_PATH).exists())
+        with self.assertRaises(ValueError):
+            kb.get_vectorstore(fresh=True)
+
+    def test_changed_embedding_refuses_cached_index(self):
+        kb.build_index(docs("old handbook"))
+        self.assertIsNotNone(kb.get_vectorstore())
+        with patch.object(kb.config, "EMBED_MODEL", "a different model"):
+            self.assertIsNone(kb.get_vectorstore())
+        self.assertEqual(self.current_text(), "old handbook")
+
+    def test_invalid_vector_and_tampered_candidate_never_publish(self):
+        kb.build_index(docs("old handbook"))
+        with patch.object(Vectors, "embed_documents", return_value=[[float("nan"), 0., 1.]]):
+            with self.assertRaises(ValueError):
+                kb.build_index(docs("new invalid"))
+        candidate = kb.build_index(docs("new candidate"), publish=False)
+        kb.backend.chroma().get_collection(candidate["collection"]).delete(ids=["0"])
+        with self.assertRaises(ValueError):
+            kb.publish_index(candidate["generation"], expected_revision=1)
+        self.assertEqual(self.current_text(), "old handbook")
+
+    def test_write_or_validation_failure_does_not_switch(self):
+        kb.build_index(docs("old handbook"))
+        for seam in ("add", "check_collection", "finish"):
+            with patch.object(kb.backend, seam, side_effect=RuntimeError("synthetic storage failure")):
+                with self.assertRaisesRegex(RuntimeError, "synthetic"):
+                    kb.build_index(docs("new handbook"))
+            self.assertEqual(self.current_text(), "old handbook")
+        states = [r["state"] for r in kb.index_status()["releases"]]
+        self.assertEqual(states.count("failed"), 3)
+
+    def test_legacy_collection_survives_first_publish_and_rollback(self):
+        from langchain_chroma import Chroma
+        legacy = Chroma(collection_name=kb.config.MILVUS_COLLECTION,
+            persist_directory=kb.config.CHROMA_DIR, embedding_function=Vectors(),
+            collection_metadata={"hnsw:space": "cosine"})
+        legacy.add_documents(docs("old legacy handbook"))
+        self.assertEqual(self.current_text(), "old legacy handbook")
+        kb.build_index(docs("new handbook"))
+        kb.rollback_index(expected_revision=1)
+        self.assertEqual(self.current_text(), "old legacy handbook")
+
+    def test_milvus_writer_preserves_dynamic_metadata_and_never_drops(self):
+        from unittest.mock import MagicMock
+        import pymilvus
+        client = MagicMock()
+        client.list_databases.return_value = [kb.config.MILVUS_DB_NAME]
+        constructor = MagicMock(return_value=client)
+        with patch.object(kb.config, "KB_BACKEND", "milvus"), patch.object(pymilvus, "MilvusClient", constructor):
+            kb.backend.create_collection("candidate_only")
+            kb.backend.add("candidate_only", docs("new handbook"), [[0., 1., 0.]], 0)
+        self.assertTrue(constructor.create_schema.call_args.kwargs["enable_dynamic_field"])
+        row = client.insert.call_args.kwargs["data"][0]
+        self.assertEqual(row["source_type"], "manual_summary")
+        self.assertEqual(client.create_collection.call_args.kwargs["collection_name"], "candidate_only")
+        client.drop_collection.assert_not_called()
+        self.assertEqual(client.close.call_count, 2)
+
 
 if __name__ == "__main__":
     unittest.main()

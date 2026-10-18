@@ -158,6 +158,7 @@ MILVUS_METRIC = _env("MILVUS_METRIC_TYPE", "COSINE")   # 第10章 P53 metric_typ
 # 知识库后端:milvus(课件默认)| chroma(过渡,仅当 Milvus 尚未拉起时)
 KB_BACKEND = _env("KB_BACKEND", "milvus").lower()
 CHROMA_DIR = _env("CHROMA_DIR", "data/chroma_db")
+KB_REGISTRY_PATH = _env("KB_REGISTRY_PATH", "data/kb_releases.db")
 
 # 检索参数(第10章 §2.5.3 p63-64 的 retrieve(question, k=5))
 KB_TOP_K = _env_int("KB_TOP_K", 5)
