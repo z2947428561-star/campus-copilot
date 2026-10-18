@@ -45,13 +45,13 @@ class SemesterContextTest(SemesterFixture, unittest.TestCase):
                 return ChatResult(generations=[ChatGeneration(message=message)])
 
         @tool
-        def calculate_gpa(runtime: ToolRuntime[UserContext]) -> str:
+        def calculate_gpa(runtime: ToolRuntime[UserContext], semester_id: str = "") -> str:
             """Return only the runtime semester to prove resumed context."""
-            return "confirmed-semester:" + str(runtime.context.semester_id)
+            return "confirmed-semester:" + str(semester_id or runtime.context.semester_id)
 
         graph = create_agent(model=ScopedModel(), tools=[calculate_gpa], checkpointer=InMemorySaver(),
             context_schema=UserContext, middleware=[HumanInTheLoopMiddleware(interrupt_on={
-                "calculate_gpa": {"allowed_decisions": ["approve", "reject"]}})])
+                "calculate_gpa": {"allowed_decisions": ["approve", "edit", "reject"]}})])
         with patch.object(server, "_agent", graph):
             item = self.client.post("/api/conversations", headers=self.alice).json()
             cid = item["id"]
@@ -61,6 +61,9 @@ class SemesterContextTest(SemesterFixture, unittest.TestCase):
             detail = self.client.get("/api/conversations/" + cid, headers=self.alice).json()
             self.assertEqual(detail["semester_id"], "2026-09")
             resume = {"conversation_id": cid, "checkpoint_id": detail["checkpoint_id"], "decisions": [{"type": "approve"}]}
+            edited = self.client.post("/api/chat", headers=self.alice, json={**resume,
+                "decisions": [{"type": "edit", "edited_action": {"name": "calculate_gpa", "args": {"semester_id": "2027-04"}}}]})
+            self.assertEqual(edited.status_code, 409)
             wrong = self.client.post("/api/chat", headers=self.alice, json={**resume, "semester_id": "2027-04"})
             self.assertEqual(wrong.status_code, 409)
             correct = self.client.post("/api/chat", headers=self.alice, json=resume)
