@@ -65,6 +65,15 @@ class SemesterCatalogTest(unittest.TestCase):
         term = self.semesters.resolve_date("2027-04-06", path=self.path)
         self.assertEqual(term["semester_id"], "2027-04")
 
+    def test_nullable_course_room_hold_is_preserved_during_migration(self):
+        with closing(sqlite3.connect(self.path)) as conn, conn:
+            conn.execute("INSERT INTO timetable(room,weekday,period,course_id,weeks) VALUES (?,?,?,?,?)",
+                         ("A101", 2, "09:00-09:45", None, "1-14"))
+        self.semesters.migrate_catalog(self.path)
+        with closing(sqlite3.connect(self.path)) as conn:
+            row = conn.execute("SELECT semester_id,room FROM timetable WHERE course_id IS NULL").fetchone()
+        self.assertEqual(row, ("2026-09", "A101"))
+
     def test_invalid_import_rolls_back_migration_and_every_row(self):
         invalid = second_term()
         invalid["timetable"][0]["course_id"] = "NO_SUCH_COURSE"
