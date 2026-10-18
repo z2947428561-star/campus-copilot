@@ -1,12 +1,12 @@
 import { requestJSON } from './api.js';
 import { clearSession, getUser, saveSession } from './session.js';
 
-export function createAuth({ onLogin, onLogout }) {
+export function createAuth({ onLogin, onLogout, onSkip }) {
   const mask = document.getElementById('login-mask');
   const username = document.getElementById('login-user');
   const password = document.getElementById('login-pass');
   const error = document.getElementById('login-err');
-  const buttons = [document.getElementById('login-submit'), document.getElementById('register-submit')];
+  const buttons = ['login-submit', 'register-submit', 'login-skip'].map(id => document.getElementById(id));
   let busy = false;
 
   function showLogin(message = '') {
@@ -17,10 +17,11 @@ export function createAuth({ onLogin, onLogout }) {
     username.focus();
   }
 
-  function showChat() {
+  function showChat({ guest = false } = {}) {
     mask.classList.remove('show');
     document.querySelector('.app-shell').inert = false;
-    document.getElementById('who').textContent = getUser();
+    document.getElementById('who').textContent = guest ? '访客' : getUser();
+    document.getElementById('logout').textContent = guest ? '登录' : '退出';
   }
 
   async function submit(kind) {
@@ -65,5 +66,12 @@ export function createAuth({ onLogin, onLogout }) {
     onLogout();
   }
 
-  return { showLogin, showChat, submit, logout };
+  function skip() {
+    if (busy) return;
+    password.value = '';
+    error.textContent = '';
+    onSkip();
+  }
+
+  return { showLogin, showChat, submit, logout, skip };
 }

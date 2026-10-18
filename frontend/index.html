@@ -26,7 +26,7 @@
       <div class="mobile-brand">Campus Copilot</div>
       <div class="user-box">
         <span class="who">你好，<b id="who"></b></span>
-        <a class="link-button" href="/database">数据浏览器</a>
+        <a class="link-button" id="database-link" href="/database">数据浏览器</a>
         <button type="button" class="link-button" id="data-toggle" aria-expanded="false" aria-controls="data-panel" data-action="toggle-data">我的数据</button>
         <button type="button" class="link-button" id="logout">退出</button>
       </div>
@@ -92,6 +92,8 @@
         <button type="button" class="primary" id="login-submit">登录</button>
         <button type="button" class="ghost" id="register-submit">注册并登录</button>
       </div>
+      <button type="button" class="skip-login" id="login-skip" aria-describedby="guest-hint">暂不登录</button>
+      <p class="field-hint guest-hint" id="guest-hint">先看看首页，登录后即可提问和保存数据。</p>
     </div>
   </div>
 </div>

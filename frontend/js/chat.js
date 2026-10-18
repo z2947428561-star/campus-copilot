@@ -2,7 +2,7 @@ import { requestJSON, streamChat } from './api.js';
 import { getUser } from './session.js';
 import { getSemesterId, lockSemester, selectSemester } from './semester.js';
 
-export function createChat() {
+export function createChat({ onLoginRequired = () => {} } = {}) {
   const container = document.getElementById('chat');
   const input = document.getElementById('input');
   const sendButton = document.getElementById('send');
@@ -24,13 +24,16 @@ export function createChat() {
   let exhausted = false;
   let ready = false;
   let pollTimer = null;
+  let guest = false;
   const selectionKey = () => 'cc_conversation:' + getUser();
 
   function controls() {
     lockSemester(busy || loading || running || !ready || pending.length > 0);
-    sendButton.disabled = busy || loading || running || exhausted || !ready || !conversationId || pending.length > 0;
+    sendButton.disabled = !guest && (busy || loading || running || exhausted || !ready || !conversationId || pending.length > 0);
     input.disabled = sendButton.disabled;
-    selector.disabled = newButton.disabled = refreshButton.disabled = busy || loading;
+    sendButton.textContent = guest ? '登录后提问' : '发送';
+    input.placeholder = guest ? '想问些什么？登录后即可提问' : '输入你的问题…';
+    selector.disabled = newButton.disabled = refreshButton.disabled = guest || busy || loading;
     yesButton.disabled = busy || loading || running || !ready || !pending.length ||
       pending.some(action => !action.allowed_decisions.includes('approve'));
     noButton.disabled = busy || loading || running || !ready || !pending.length ||
@@ -177,6 +180,7 @@ export function createChat() {
   }
 
   async function send(question) {
+    if (guest) { onLoginRequired(); return; }
     if (busy || loading || running || exhausted || !ready || !conversationId || pending.length) return;
     const text = (question ?? input.value).trim();
     if (!text) return;
@@ -198,6 +202,7 @@ export function createChat() {
     controller?.abort();
     controller = null;
     busy = loading = false;
+    guest = false;
     running = exhausted = ready = false;
     pending = [];
     conversationId = checkpointId = null;
@@ -212,5 +217,13 @@ export function createChat() {
   newButton.addEventListener('click', createConversation);
   refreshButton.addEventListener('click', () => open(conversationId));
   controls();
-  return { send, decide, reset, open, focus: () => input.focus() };
+  function preview() {
+    reset();
+    guest = true;
+    status.textContent = '当前为访客浏览。登录后可开始对话，保存课程与成绩。';
+    controls();
+    document.getElementById('logout').focus();
+  }
+
+  return { send, decide, reset, open, preview, focus: () => input.focus() };
 }
