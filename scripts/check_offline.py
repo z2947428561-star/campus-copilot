@@ -19,6 +19,7 @@ CHECKS = (
     "test_run_registry.py",
     "test_chat_history.py",
     "test_chroma_rebuild.py",
+    "test_kb_restore.py",
     "test_policy_evidence.py",
     "test_database_browser.py",
     "test_semesters.py",

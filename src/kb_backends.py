@@ -5,7 +5,7 @@ import math
 from langchain_core.documents import Document
 
 import config
-from kb_releases import absolute_path
+from kb_releases import absolute_path, content_hash
 
 
 def checked_vectors(vectors, count):
@@ -95,6 +95,31 @@ def check_collection(name):
             indexes = client.list_indexes(collection_name=name, field_name="vector")
             if not indexes or client.describe_index(collection_name=name, index_name=indexes[0]).get("metric_type", "").upper() != "COSINE":
                 raise ValueError("Index must use COSINE")
+
+
+def verify_restored_chroma(release):
+    """Verify ready collection content in build order without an embedding service."""
+    check_collection(release["collection"])
+    collection = chroma().get_collection(release["collection"], embedding_function=None)
+    size = release["chunk_count"]
+    if size < 1 or collection.count() != size:
+        raise ValueError("Restored collection count differs from its release")
+    documents = []
+    for offset in range(0, size, 100):
+        ids = [str(i) for i in range(offset, min(offset + 100, size))]
+        batch = collection.get(ids=ids, include=["documents", "metadatas"])
+        rows = {key: Document(page_content=text, metadata=meta or {}) for key, text, meta in
+                zip(batch["ids"], batch["documents"], batch["metadatas"])}
+        if set(rows) != set(ids):
+            raise ValueError("Restored collection has missing or unexpected chunk IDs")
+        documents.extend(rows[key] for key in ids)
+    if content_hash(documents) != release["content_hash"]:
+        # The original Chroma writer adds a placeholder only for empty metadata.
+        normalized = [Document(page_content=d.page_content,
+                      metadata={} if d.metadata == {"chunk_id": i} else d.metadata)
+                      for i, d in enumerate(documents)]
+        if content_hash(normalized) != release["content_hash"]:
+            raise ValueError("Restored text or metadata differs from its release")
 
 
 class Reader:

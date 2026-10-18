@@ -174,14 +174,15 @@ def main(argv=None):
     action.add_argument("--stage-only", action="store_true", help="构建并验证，但不切换生效版本")
     action.add_argument("--publish", metavar="GENERATION", help="发布已验证的候选版本")
     action.add_argument("--rollback", action="store_true", help="切回上一生效版本")
-    parser.add_argument("--expected-revision", type=int, help="发布/回滚必须提供刚确认的修订号")
+    action.add_argument("--rebind-from", metavar="OLD_CHROMA_DIR", help="校验恢复集合，将旧绝对路径登记迁移至当前 Chroma 目录")
+    parser.add_argument("--expected-revision", type=int, help="发布/回滚/重绑定必须提供已确认的修订号")
     parser.add_argument("--batch-size", type=int, default=64)
     args = parser.parse_args(argv)
-    if args.publish or args.rollback:
+    if args.publish or args.rollback or args.rebind_from is not None:
         if args.expected_revision is None or args.expected_revision < 0:
-            parser.error("发布或回滚需要 --expected-revision 非负整数")
+            parser.error("发布、回滚或重绑定需要 --expected-revision 非负整数")
     elif args.expected_revision is not None:
-        parser.error("--expected-revision 只适用于 --publish 或 --rollback")
+        parser.error("--expected-revision 只适用于 --publish、--rollback 或 --rebind-from")
     try:
         if args.status:
             result = kb.index_status()
@@ -189,6 +190,8 @@ def main(argv=None):
             result = kb.publish_index(args.publish, expected_revision=args.expected_revision)
         elif args.rollback:
             result = kb.rollback_index(expected_revision=args.expected_revision)
+        elif args.rebind_from is not None:
+            result = kb.rebind_chroma(args.rebind_from, expected_revision=args.expected_revision)
         else:
             build(stage_only=args.stage_only, batch_size=args.batch_size)
             return 0

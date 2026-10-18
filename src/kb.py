@@ -103,6 +103,28 @@ def index_status():
     return releases.snapshot()
 
 
+def rebind_chroma(old_directory, *, expected_revision):
+    """Rebind an old absolute-path registry only after checking restored content."""
+    def validate(state):
+        active = state["active"]
+        for entry in (active, state["previous"]):
+            if entry and entry["generation"] != "legacy" and entry["state"] != "ready":
+                raise ValueError("A restored publication pointer references an unready release")
+        if active["generation"] != "legacy" and (
+            active["embedding"] != releases.embedding_contract()
+        ):
+            raise ValueError("Active release is not ready or embedding configuration differs")
+        if active["generation"] == "legacy" and state["revision"]:
+            backend.check_collection(active["collection"])
+        for release in state["releases"]:
+            if release["state"] == "ready":
+                backend.verify_restored_chroma(release)
+
+    result = releases.rebind_chroma(old_directory, expected_revision, validate)
+    reset_cache()
+    return result
+
+
 def build_index(documents, *, publish=True, batch_size=64):
     """Build an isolated candidate; any failure preserves the active collection."""
     documents = list(documents)
@@ -177,7 +199,8 @@ def get_vectorstore(fresh=False):
             contract = releases.embedding_contract()
             if active["generation"] != "legacy" and active["embedding"] != contract:
                 raise ValueError("Published index embedding configuration differs; rebuild before retrieval")
-            key = (releases.scope(), state["revision"], active["collection"], contract)
+            key = (releases.scope(), str(releases.absolute_path(config.KB_REGISTRY_PATH).resolve()),
+                   state["revision"], active["collection"], contract)
             if _vectorstore is not None and key == _cache_key:
                 return _vectorstore
             backend.check_collection(active["collection"])
