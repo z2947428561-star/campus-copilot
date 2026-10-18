@@ -36,6 +36,7 @@ def create_tables(cur: sqlite3.Cursor) -> None:
         DROP TABLE IF EXISTS calendar_weeks;
         DROP TABLE IF EXISTS semester_events;
         DROP TABLE IF EXISTS grades;
+        DROP TABLE IF EXISTS semesters;
 
         CREATE TABLE courses(
             course_id TEXT PRIMARY KEY,
@@ -199,6 +200,10 @@ def main() -> None:
     if SEED_PATH.is_file():
         replace_seed(conn, json.loads(SEED_PATH.read_text(encoding="utf-8")))
     conn.commit()
+    # Seed files remain backward-compatible; explicitly generated catalogs use the
+    # versioned semester schema. This command is already the destructive initializer.
+    from semesters import migrate_catalog
+    migrate_catalog(DB_PATH)
 
     print(f"数据库已重建:{DB_PATH}\n")
     for table in ["courses", "classrooms", "timetable", "calendar_weeks", "semester_events", "grades"]:
