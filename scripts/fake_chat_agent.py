@@ -39,17 +39,24 @@ class BrowserTestModel(BaseChatModel):
         return ChatResult(generations=[ChatGeneration(message=reply)])
 
 
-def build_agent():
+def build_agent(*, summarize=False):
     @tool
     def calculate_gpa(semester: str = "test") -> str:
         """Return fictional GPA data for browser tests."""
         return "测试成绩 3.7，学期 " + semester
 
+    middleware = get_call_limit_middlewares()
+    if summarize:
+        from langchain.agents.middleware import SummarizationMiddleware
+        from langchain_core.language_models.fake_chat_models import FakeListChatModel
+        middleware.append(SummarizationMiddleware(model=FakeListChatModel(responses=['synthetic-summary']),
+            trigger=('messages', 6), keep=('messages', 2)))
+    middleware.append(HumanInTheLoopMiddleware(
+        interrupt_on={"calculate_gpa": {"allowed_decisions": ["approve", "reject"],
+                                        "description": "测试确认"}}))
     return create_agent(
         model=BrowserTestModel(), tools=[calculate_gpa],
         checkpointer=get_checkpointer(),
         context_schema=UserContext,
-        middleware=[*get_call_limit_middlewares(), HumanInTheLoopMiddleware(
-            interrupt_on={"calculate_gpa": {"allowed_decisions": ["approve", "reject"],
-                                            "description": "测试确认"}})],
+        middleware=middleware,
     )

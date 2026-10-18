@@ -40,6 +40,7 @@ SSE 事件类型包括 `token`、`interrupt`、`limit`、`done`、`error`。恢�
 | 可选本机选课经验、教师讨论、问答 | `data/campus.db` 的独立经验表 | 私有 `.local.json` 种子，不混入课程表 | `src/course_recommendations.py`、`src/tools/recommendations.py` |
 | 账号、token 哈希、个人成绩和选课 | PostgreSQL | `MEMORY_BACKEND=sqlite` 时使用 `data/memory.db` 或配置路径 | `src/auth.py`、`src/student_data.py` |
 | 会话归属、标题、创建时间 | PostgreSQL 账号库 | SQLite 账号库 | `src/conversations.py` |
+| 网页用户与模型原文 | PostgreSQL 账号库 | SQLite 账号库 | `src/chat_history.py`；独立于模型摘要 |
 | 会话状态、人工确认中断现场 | PostgreSQL Checkpointer | SQLite Checkpointer | `src/agent/memory.py` |
 | 长期用户画像 | PostgreSQL Store | SQLite Store | `src/agent/memory.py`、`src/tools/profile.py` |
 | 政策向量与片段元数据 | Milvus | Chroma 本地目录 | `src/kb.py`、`src/kb_backends.py` |

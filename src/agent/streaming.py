@@ -120,6 +120,7 @@ def stream_turn(
     context=None,
     max_interrupt_rounds: int = 3,
     on_limit: Callable[[str], None] | None = None,
+    on_messages: Callable[[list], None] | None = None,
 ) -> str:
     """跑完一轮对话,直到没有待处理中断。
 
@@ -132,6 +133,7 @@ def stream_turn(
         context:       第09章 §4(p60-80)的运行级静态上下文(承载 user_id)
         max_interrupt_rounds: 防止中断-恢复无限循环
         on_limit: 模型或工具达到限额时的回调；未提供时以可读文本反馈
+        on_messages: 保存完整消息更新；在后续摘要裁剪前调用，不改变模型上下文
 
     返回:本轮模型输出的完整文本。
 
@@ -149,6 +151,10 @@ def stream_turn(
         if context is not None:
             stream_kwargs["context"] = context
         for mode, data in agent.stream(current_inputs, cfg, **stream_kwargs):
+            if mode == "updates" and on_messages:
+                for update in data.values():
+                    if isinstance(update, dict) and isinstance(update.get("messages"), list):
+                        on_messages(update["messages"])
             if mode == "messages":
                 chunk, metadata = data
                 text = model_text(chunk, metadata)

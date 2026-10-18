@@ -3,13 +3,15 @@ from agent.streaming import InterruptInfo, extract_text
 import config
 
 
-def conversation_state(agent, cfg):
-    snapshot = agent.get_state(cfg)
+def conversation_state(agent, cfg, *, snapshot=None):
+    snapshot = agent.get_state(cfg) if snapshot is None else snapshot
     values = snapshot.values or {}
     messages = []
     for message in values.get("messages", []):
         kind = getattr(message, "type", None)
         if kind not in ("human", "ai"):
+            continue
+        if getattr(message, 'additional_kwargs', {}).get('lc_source') == 'summarization':
             continue
         text = extract_text(message)
         if text:

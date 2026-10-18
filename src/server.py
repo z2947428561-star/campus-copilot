@@ -46,6 +46,7 @@ import sys
 import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
+from uuid import uuid4
 
 # uvicorn 以项目根为工作目录导入 src.server,此时 src/ 不在 sys.path,
 # agent/ tools/ 等兄弟包会找不到 —— 先把本文件所在目录塞进去
@@ -67,6 +68,7 @@ from agent.streaming import stream_turn
 from agent.web_runs import EventStream, RunRegistry
 from context import UserContext
 import conversations
+import chat_history
 import database_browser
 import semesters
 from student_data import (
@@ -89,6 +91,7 @@ async def lifespan(_app: FastAPI):
     auth.init_auth()
     init_student_data()
     conversations.init_conversations()
+    chat_history.init_history()
     yield
     close_memory()
 
@@ -284,6 +287,16 @@ def conversation_config(user_id, conversation_id):
     )
 
 
+def archived_conversation_state(agent, cfg, user_id):
+    snapshot = agent.get_state(cfg)
+    thread_id = cfg["configurable"]["thread_id"]
+    chat_history.import_checkpoints(user_id, thread_id, agent, cfg, snapshot)
+    chat_history.capture(user_id, thread_id, (snapshot.values or {}).get("messages", []))
+    state = conversation_state(agent, cfg, snapshot=snapshot)
+    state["messages"] = chat_history.messages(user_id, thread_id)
+    return state
+
+
 @app.get("/api/conversations/{conversation_id}")
 def conversation_detail(conversation_id: str, user_id: str = Depends(current_user)):
     item = owned_conversation(user_id, conversation_id)
@@ -291,7 +304,7 @@ def conversation_detail(conversation_id: str, user_id: str = Depends(current_use
     cfg = conversation_config(user_id, conversation_id)
     state, running = _runs.snapshot(
         cfg["configurable"]["thread_id"], lambda: {
-            **conversation_state(agent, cfg), "semester_id": conversations.semester_for(user_id, conversation_id)})
+            **archived_conversation_state(agent, cfg, user_id), "semester_id": conversations.semester_for(user_id, conversation_id)})
     return {**item, **state, "running": running}
 
 
@@ -360,7 +373,9 @@ def _build_inputs(req: ChatRequest):
     if req.message is not None:
         from messages import user_turn
 
-        return user_turn(req.message)
+        inputs = user_turn(req.message)
+        inputs["messages"][0].id = "web-user:" + uuid4().hex
+        return inputs
     if req.decisions is not None:
         # 前端直接给完整决策列表(多动作 / edit)
         return Command(resume={"decisions": req.decisions})
@@ -383,7 +398,7 @@ def chat(req: ChatRequest, user_id: str = Depends(current_user)):
         raise HTTPException(status_code=409, detail="该会话正在处理请求，请稍后刷新，或新建会话")
     try:
         agent = get_web_agent()
-        state = conversation_state(agent, cfg)
+        state = archived_conversation_state(agent, cfg, user_id)
         validate_operation(req, state)
         incoming_semester = requested_term(req.semester_id)["semester_id"] if req.semester_id else None
         saved_semester = conversations.semester_for(user_id, req.conversation_id)
@@ -421,8 +436,10 @@ def chat(req: ChatRequest, user_id: str = Depends(current_user)):
         if req.message is not None and state["exhausted"]:
             raise HTTPException(status_code=429, detail="当前会话额度已用完，请新建会话；原记录仍保留")
         inputs = _build_inputs(req)
+        history_position = chat_history.position(user_id, thread_id)
         if req.message:
             conversations.name_conversation(user_id, req.conversation_id, req.message)
+            chat_history.capture(user_id, thread_id, inputs["messages"], run_semester_id)
     except BaseException:
         _runs.release(thread_id)
         raise
@@ -431,6 +448,11 @@ def chat(req: ChatRequest, user_id: str = Depends(current_user)):
 
     def run_turn():
         saw_interrupt = False
+        streamed = []
+
+        def on_token(text):
+            streamed.append(text)
+            delivery.publish({"type": "token", "text": text})
 
         def on_decide(info):
             nonlocal saw_interrupt
@@ -449,7 +471,8 @@ def chat(req: ChatRequest, user_id: str = Depends(current_user)):
         try:
             stream_turn(
                 agent, inputs, cfg, on_decide=on_decide,
-                on_token=lambda text: delivery.publish({"type": "token", "text": text}),
+                on_token=on_token,
+                on_messages=lambda messages: chat_history.capture(user_id, thread_id, messages, run_semester_id),
                 on_limit=lambda kind: delivery.publish({
                     "type": "limit", "kind": kind,
                     "message": "已达到调用上限，请简化问题重试；会话额度耗尽时请新建会话。",
@@ -467,9 +490,16 @@ def chat(req: ChatRequest, user_id: str = Depends(current_user)):
             logging.exception("chat stream error")
             delivery.publish({"type": "error", "message": "服务暂时不可用，请稍后刷新会话再试"})
         finally:
-            # The worker retains ownership even when the browser disconnects.
-            _runs.release(thread_id)
-            delivery.finish()
+            try:
+                chat_history.unrecorded_reply(user_id, thread_id, history_position, ''.join(streamed),
+                                               "web-reply:" + uuid4().hex, run_semester_id)
+            except Exception:
+                logging.exception("chat history write failed")
+                delivery.publish({"type": "error", "message": "聊天记录保存失败，请刷新后核对"})
+            finally:
+                # The worker retains ownership until visible history is persisted.
+                _runs.release(thread_id)
+                delivery.finish()
 
     async def event_stream():
         events = delivery.events()

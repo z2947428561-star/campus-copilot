@@ -16,6 +16,7 @@ CHECKS = (
     "test_student_data.py",
     "test_server_security.py",
     "test_conversations.py",
+    "test_chat_history.py",
     "test_chroma_rebuild.py",
     "test_policy_evidence.py",
     "test_database_browser.py",
