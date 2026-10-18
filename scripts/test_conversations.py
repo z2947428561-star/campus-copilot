@@ -304,6 +304,45 @@ class ConversationTests(unittest.TestCase):
             worker.result(timeout=5)
         self.assertEqual(registry.snapshot("thread", lambda: "final"), ("final", False))
 
+    def test_slow_detail_does_not_block_chat_or_detail_of_another_conversation(self):
+        first, second = self.create(), self.create()
+        started, unblock, progressed = threading.Event(), threading.Event(), threading.Event()
+        agent = fake_agent()
+        original = agent.get_state
+        first_thread = self.server.conversation_config('CVS2601001', first['id'])['configurable']['thread_id']
+
+        def get_state(cfg):
+            if cfg['configurable']['thread_id'] == first_thread:
+                started.set()
+                if not unblock.wait(8):
+                    raise TimeoutError('slow history read not released')
+            return original(cfg)
+
+        agent.get_state = get_state
+
+        def other_requests():
+            response = self.client.post('/api/chat', headers=self.owner,
+                json={'conversation_id': second['id'], 'message': '另一会话继续'})
+            self.assertEqual(response.status_code, 200, response.text)
+            self.assertNotIn('"type": "error"', response.text)
+            response = self.client.get('/api/conversations/' + second['id'], headers=self.owner)
+            self.assertEqual(response.status_code, 200, response.text)
+            self.assertFalse(response.json()['running'])
+            progressed.set()
+
+        with patch.object(self.server, 'get_web_agent', return_value=agent), \
+             patch.object(self.server, 'stream_turn') as turn, ThreadPoolExecutor(max_workers=2) as pool:
+            turn.side_effect = lambda *args, **kwargs: kwargs['on_token']('另一会话完成')
+            slow = pool.submit(self.client.get, '/api/conversations/' + first['id'], headers=self.owner)
+            try:
+                self.assertTrue(started.wait(3))
+                other = pool.submit(other_requests)
+                self.assertTrue(progressed.wait(3), 'Another conversation waited for slow history I/O')
+                other.result(timeout=1)
+            finally:
+                unblock.set()
+            self.assertEqual(slow.result(timeout=3).status_code, 200)
+
 
 if __name__ == "__main__":
     unittest.main()
