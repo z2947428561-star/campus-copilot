@@ -1,20 +1,19 @@
 """Authenticated, read-only projections of the application's data stores.
 
 SQL identifiers come exclusively from SPECS. Personal predicates are always supplied
-by the server. Index inspection deliberately bypasses kb.get_vectorstore(): that path
-creates collections and embeddings, neither of which belongs in a data browser.
+by the server. Index inspection shares the publication pointer with retrieval,
+without constructing an embedding model.
 """
-from contextlib import contextmanager, closing
+from contextlib import contextmanager
 from dataclasses import dataclass
 import json
 import logging
 from pathlib import Path
 import re
-import sqlite3
 
 import auth
+import storage
 import config
-import student_data
 import semesters
 
 logger = logging.getLogger("campus")
@@ -88,7 +87,7 @@ SPECS = {
 
 SOURCES = (
     ("campus", "公共校园库", "SQLite", "公共数据"),
-    ("personal", "我的数据", "PostgreSQL" if auth._use_pg() else "SQLite", "当前账号"),
+    ("personal", "我的数据", "PostgreSQL" if storage.uses_postgres() else "SQLite", "当前账号"),
     ("documents", "政策文档", "Markdown", "公开快照"),
     ("index", "向量索引", config.KB_BACKEND, "按需连接"),
 )
@@ -113,20 +112,16 @@ def columns(spec):
 @contextmanager
 def sql_connection(source):
     if source == "campus":
-        # mode=ro prevents even an empty file being created for a wrong path.
-        uri = student_data.CATALOG_DB.resolve().as_uri() + "?mode=ro"
-        with closing(sqlite3.connect(uri, uri=True, timeout=2)) as conn:
-            conn.execute("PRAGMA query_only=ON")
+        with semesters.catalog_connection() as conn:
             yield conn
     else:
-        with auth._conn() as conn:
-            conn.execute("SET TRANSACTION READ ONLY" if auth._use_pg() else "PRAGMA query_only=ON")
+        with storage.personal_connection(read_only=True) as conn:
             yield conn
 
 
 def sql_page(source, name, spec, user_id, q, offset, size, sort, direction):
     names = [f[0] for f in spec.fields]
-    ph = "?" if source == "campus" else auth._ph()
+    ph = "?" if source == "campus" else storage.placeholder()
     clauses, params = [], []
     if source == "personal":
         clauses.append(f'"user_id"={ph}')
@@ -184,7 +179,7 @@ def catalog(user_id):
                     total = len(semesters.list_semesters())
                 elif source in {"campus", "personal"}:
                     with sql_connection(source) as conn:
-                        where = f" WHERE user_id={auth._ph()}" if source == "personal" else ""
+                        where = f" WHERE user_id={storage.placeholder()}" if source == "personal" else ""
                         total = conn.execute(f'SELECT COUNT(*) FROM "{name}"{where}',
                                              (user_id,) if source == "personal" else ()).fetchone()[0]
                 elif source == "documents":

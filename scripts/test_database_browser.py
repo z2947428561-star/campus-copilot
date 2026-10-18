@@ -155,10 +155,10 @@ class DatabaseBrowserTest(unittest.TestCase):
         conn = MagicMock()
         conn.execute.return_value.fetchone.return_value = (0,)
         conn.execute.return_value.fetchall.return_value = []
-        with patch.object(self.browser.auth, "_use_pg", return_value=True), \
-             patch.object(self.browser.auth, "_ph", return_value="%s"), \
+        import psycopg
+        with patch.object(self.browser.storage, "uses_postgres", return_value=True), \
              patch.object(self.browser.auth, "authenticate", return_value="AAA2509001"), \
-             patch.object(self.browser.auth, "_conn") as factory:
+             patch.object(psycopg, "connect") as factory:
             factory.return_value.__enter__.return_value = conn
             result = self.get("personal", "student_grades", q="CS101")
         self.assertEqual(result.status_code, 200)

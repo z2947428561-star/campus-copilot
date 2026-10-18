@@ -1,7 +1,7 @@
 """登录用户的课程与成绩数据；公共课程目录仍在 campus.db。"""
 from pathlib import Path
 
-from auth import _conn, _ph, _use_pg
+from storage import personal_connection as _conn, placeholder as _ph, uses_postgres as _use_pg
 from semesters import catalog_connection, resolve_semester, term_rows
 
 CATALOG_DB = Path(__file__).resolve().parents[1] / "data" / "campus.db"
@@ -43,20 +43,16 @@ def set_grade(user_id: str, course_id: str, grade_point: float, letter: str,
         raise ValueError("绩点需在 0–4 之间，等级不能为空")
     ph = _ph()
     with _conn() as conn:
-        old = conn.execute(
-            f"SELECT credits_snapshot,name_snapshot FROM student_grades WHERE user_id={ph} AND semester={ph} AND course_id={ph}",
-            (user_id, term["storage_key"], course["course_id"])).fetchone()
-        credits = old[0] if old and old[0] is not None else course["credits"]
-        name = old[1] if old and old[1] is not None else course["name"]
-        conn.execute(
-            f"DELETE FROM student_grades WHERE user_id={ph} AND semester={ph} AND course_id={ph}",
-            (user_id, term["storage_key"], course["course_id"]),
-        )
-        conn.execute(
+        credits, name = conn.execute(
             f"INSERT INTO student_grades (user_id,semester,course_id,grade_point,letter,credits_snapshot,name_snapshot) "
-            f"VALUES ({ph},{ph},{ph},{ph},{ph},{ph},{ph})",
-            (user_id, term["storage_key"], course["course_id"], grade_point, letter.strip().upper(), credits, name),
-        )
+            f"VALUES ({ph},{ph},{ph},{ph},{ph},{ph},{ph}) "
+            "ON CONFLICT(user_id,semester,course_id) DO UPDATE SET "
+            "grade_point=excluded.grade_point, letter=excluded.letter, "
+            "credits_snapshot=COALESCE(student_grades.credits_snapshot,excluded.credits_snapshot), "
+            "name_snapshot=COALESCE(student_grades.name_snapshot,excluded.name_snapshot) "
+            "RETURNING credits_snapshot,name_snapshot",
+            (user_id, term["storage_key"], course["course_id"], grade_point, letter.strip().upper(), course["credits"], course["name"]),
+        ).fetchone()
         conn.commit()
     return {**course, "credits": credits, "name": name, "grade_point": grade_point, "letter": letter.strip().upper(),
             "semester": term["label"], "semester_id": term["semester_id"]}
@@ -101,11 +97,8 @@ def set_course(user_id: str, course_id: str, semester: str | None = None) -> dic
     ph = _ph()
     with _conn() as conn:
         conn.execute(
-            f"DELETE FROM student_courses WHERE user_id={ph} AND semester={ph} AND course_id={ph}",
-            (user_id, term["storage_key"], course["course_id"]),
-        )
-        conn.execute(
-            f"INSERT INTO student_courses (user_id,semester,course_id) VALUES ({ph},{ph},{ph})",
+            f"INSERT INTO student_courses (user_id,semester,course_id) VALUES ({ph},{ph},{ph}) "
+            "ON CONFLICT(user_id,semester,course_id) DO NOTHING",
             (user_id, term["storage_key"], course["course_id"]),
         )
         conn.commit()

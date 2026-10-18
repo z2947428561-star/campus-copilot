@@ -2,7 +2,7 @@
 import time
 from uuid import uuid4
 
-from auth import _conn, _ph
+from storage import personal_connection as _conn, placeholder as _ph
 from agent.runtime import default_thread_id
 
 

@@ -40,20 +40,17 @@
     —— 后者让测试可以用临时库,而不是删生产库(见 scripts/test_m4.py)。
 """
 import logging
-import os
 from contextlib import ExitStack
 from pathlib import Path
 
 import config
+from storage import personal_path
 
 logger = logging.getLogger("campus")
 
-# 项目根 = src/agent/memory.py 的上两级
-_ROOT = Path(__file__).resolve().parents[2]
-
 # 兼容旧引用:scripts/test_m4.py 曾 `from agent.memory import DB_PATH`
 # 路径优先取 config.MEMORY_DB_PATH(测试可注入临时库),否则用项目根下的 data/memory.db
-DB_PATH = Path(config.MEMORY_DB_PATH) if config.MEMORY_DB_PATH else (_ROOT / "data" / "memory.db")
+DB_PATH = personal_path()
 
 # 模块级 ExitStack:连接随进程存活,退出/测试收尾时由 close_memory() 统一关闭
 _stack = ExitStack()

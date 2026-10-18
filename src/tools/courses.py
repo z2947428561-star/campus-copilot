@@ -10,12 +10,14 @@
 """
 import json
 import sqlite3
+from pathlib import Path
 
 from langchain_core.tools import tool
 
 from .schemas import CourseQueryInput
+from semesters import catalog_connection
 
-DB_PATH = "data/campus.db"
+DB_PATH = Path(__file__).resolve().parents[2] / "data" / "campus.db"
 
 SEM_CN = {"Sep": "九月学期", "Apr": "四月学期"}
 
@@ -65,8 +67,7 @@ def query_course(query: str) -> str:
         含 candidates 列表提示改用课程代码精确查询。
     """
     q = query.strip()
-    conn = sqlite3.connect(DB_PATH)
-    try:
+    with catalog_connection(DB_PATH) as conn:
         row = conn.execute(
             "SELECT course_id, name, credits, dept, sem, year FROM courses "
             "WHERE course_id = ?",
@@ -102,9 +103,6 @@ def query_course(query: str) -> str:
         dependents = conn.execute(
             "SELECT course_id FROM courses WHERE prerequisites LIKE ?", (f'%"{cid}"%',)
         ).fetchall()
-    finally:
-        conn.close()
-
     payload = {
         "course_id": cid,
         "name": name,

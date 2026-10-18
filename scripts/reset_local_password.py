@@ -12,12 +12,13 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 import auth  # noqa: E402
+from storage import personal_connection, placeholder  # noqa: E402
 
 
 def account_exists(username: str) -> bool:
-    with auth._conn() as conn:
+    with personal_connection(read_only=True) as conn:
         return conn.execute(
-            f"SELECT 1 FROM web_users WHERE username = {auth._ph()}",
+            f"SELECT 1 FROM web_users WHERE username = {placeholder()}",
             (username,),
         ).fetchone() is not None
 
@@ -30,16 +31,16 @@ def reset_password(username: str, password: str) -> bool:
         raise ValueError("新密码需为 8–128 位，且同时包含字母和数字")
 
     salt = secrets.token_hex(16)
-    with auth._conn() as conn:
+    with personal_connection() as conn:
         updated = conn.execute(
-            f"UPDATE web_users SET password_hash = {auth._ph()}, salt = {auth._ph()} "
-            f"WHERE username = {auth._ph()}",
+            f"UPDATE web_users SET password_hash = {placeholder()}, salt = {placeholder()} "
+            f"WHERE username = {placeholder()}",
             (auth._hash_password(password, salt), salt, username),
         )
         if updated.rowcount != 1:
             return False
         conn.execute(
-            f"DELETE FROM web_tokens WHERE username = {auth._ph()}",
+            f"DELETE FROM web_tokens WHERE username = {placeholder()}",
             (username,),
         )
         conn.commit()

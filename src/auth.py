@@ -28,9 +28,10 @@ import sqlite3
 import time
 import threading
 from collections import OrderedDict, deque
-from contextlib import contextmanager
 
 import config
+# Compatibility aliases for older local scripts. Other modules use storage directly.
+from storage import personal_connection as _conn, placeholder as _ph, uses_postgres as _use_pg
 
 logger = logging.getLogger("campus")
 
@@ -70,34 +71,6 @@ def _check_login_rate(username: str) -> None:
         attempts.append(now)
         while len(_login_attempts) > _MAX_TRACKED_NAMES:
             _login_attempts.popitem(last=False)
-
-
-def _use_pg() -> bool:
-    return (config.MEMORY_BACKEND or "").lower() == "postgres"
-
-
-@contextmanager
-def _conn():
-    """按后端开连接;占位符差异由 _ph() 吸收。"""
-    if _use_pg():
-        import psycopg
-
-        with psycopg.connect(config.DATABASE_URL) as c:
-            yield c
-    else:
-        from agent.memory import DB_PATH
-
-        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-        c = sqlite3.connect(str(DB_PATH))
-        try:
-            with c:
-                yield c
-        finally:
-            c.close()
-
-
-def _ph() -> str:
-    return "%s" if _use_pg() else "?"
 
 
 def init_auth() -> None:

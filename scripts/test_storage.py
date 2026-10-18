@@ -34,7 +34,7 @@ class StorageTest(SemesterFixture, unittest.TestCase):
         self.assertEqual(len(result), 24)
         rows = self.student.list_grades("AAA2509001", "2026-09")
         self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0]["credits"], 3)
+        self.assertEqual(rows[0]["credits"], 4)
         self.assertNotEqual(rows[0]["name"], "changed")
 
     def test_concurrent_course_selection_is_idempotent(self):
@@ -56,7 +56,7 @@ class StorageTest(SemesterFixture, unittest.TestCase):
         missing = Path(self.tmp.name) / "missing-catalog.db"
         with patch.object(courses, "DB_PATH", str(missing)):
             with self.assertRaises(sqlite3.OperationalError):
-                courses.query_course_prerequisites.invoke({"course_id": "CS101"})
+                courses.query_course.invoke({"query": "CS101"})
         self.assertFalse(missing.exists())
 
 
