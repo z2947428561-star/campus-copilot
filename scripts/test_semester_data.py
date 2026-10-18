@@ -16,7 +16,7 @@ from browser_fixtures import create_catalog
 from test_semesters import second_term
 
 
-class SemesterDataTest(unittest.TestCase):
+class SemesterFixture:
     @classmethod
     def setUpClass(cls):
         cls.tmp = tempfile.TemporaryDirectory(prefix="semester-data-")
@@ -64,6 +64,8 @@ class SemesterDataTest(unittest.TestCase):
             json={"course_id": course, "grade_point": point, "letter": "A-", "semester_id": semester})
         self.assertEqual(response.status_code, 200, response.text)
 
+
+class SemesterDataTest(SemesterFixture, unittest.TestCase):
     def test_same_course_across_semesters_and_users_is_independent(self):
         self.save_grade("2026-09", 3.7)
         self.save_grade("2027-04", 1.)
