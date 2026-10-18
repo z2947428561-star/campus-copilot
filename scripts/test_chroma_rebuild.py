@@ -143,6 +143,21 @@ class ChromaPublicationTest(unittest.TestCase):
         client.drop_collection.assert_not_called()
         self.assertEqual(client.close.call_count, 2)
 
+    def test_database_browser_follows_published_and_rolled_back_collection(self):
+        import database_browser
+        kb.build_index(docs("old handbook"))
+        second = kb.build_index(docs("new handbook"))
+        rows, total, more, info = database_browser.index_page("", 0, 25)
+        self.assertEqual([r["text"] for r in rows], ["new handbook"])
+        self.assertEqual(info["generation"], second["generation"])
+        self.assertEqual(info["revision"], 2)
+        self.assertEqual(total, 1)
+        self.assertFalse(more)
+        kb.rollback_index(expected_revision=2)
+        rows, _, _, info = database_browser.index_page("", 0, 25)
+        self.assertEqual([r["text"] for r in rows], ["old handbook"])
+        self.assertEqual(info["revision"], 3)
+
 
 if __name__ == "__main__":
     unittest.main()
