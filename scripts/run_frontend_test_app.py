@@ -23,9 +23,10 @@ def main() -> None:
         os.environ["MEMORY_DB_PATH"] = str(Path(tmp) / "memory.db")
         os.environ["KB_BACKEND"] = "chroma"
         os.environ["CHROMA_DIR"] = str(Path(tmp) / "missing-chroma")
-        from browser_fixtures import create_catalog
+        from browser_fixtures import create_catalog, add_test_semester
         catalog_path = Path(tmp) / "campus.db"
         create_catalog(catalog_path)
+        add_test_semester(catalog_path)
         import uvicorn
         from src import server
         import student_data

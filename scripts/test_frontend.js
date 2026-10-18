@@ -156,7 +156,7 @@ async page => {
   await page.reload();
   await page.waitForFunction(() => !document.querySelector('#login-mask').classList.contains('show'));
   ensure(await page.locator('#who').textContent() === username, 'Stored session lost after reload');
-  await page.route('**/api/me/courses', route => route.fulfill({ status: 401,
+  await page.route('**/api/me/courses?*', route => route.fulfill({ status: 401,
     contentType: 'application/json', body: '{"detail":"expired"}' }));
   await page.locator('#data-toggle').click();
   await page.locator('#login-mask.show').waitFor();

@@ -12,6 +12,27 @@ def init_conversations():
             user_id TEXT NOT NULL, conversation_id TEXT NOT NULL,
             title TEXT NOT NULL, created_at DOUBLE PRECISION NOT NULL,
             PRIMARY KEY (user_id, conversation_id))""")
+        conn.execute("""CREATE TABLE IF NOT EXISTS web_conversation_semesters (
+            user_id TEXT NOT NULL, conversation_id TEXT NOT NULL, semester_id TEXT NOT NULL,
+            PRIMARY KEY (user_id, conversation_id))""")
+        conn.commit()
+
+
+def semester_for(user_id, conversation_id):
+    with _conn() as conn:
+        row = conn.execute(
+            f"SELECT semester_id FROM web_conversation_semesters WHERE user_id={_ph()} AND conversation_id={_ph()}",
+            (user_id, conversation_id)).fetchone()
+    return row[0] if row else None
+
+
+def set_semester(user_id, conversation_id, semester_id):
+    ph = _ph()
+    with _conn() as conn:
+        conn.execute(
+            f"INSERT INTO web_conversation_semesters(user_id,conversation_id,semester_id) VALUES ({ph},{ph},{ph}) "
+            "ON CONFLICT(user_id,conversation_id) DO UPDATE SET semester_id=excluded.semester_id",
+            (user_id, conversation_id, semester_id))
         conn.commit()
 
 

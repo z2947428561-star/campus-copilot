@@ -18,6 +18,7 @@ frontend/
     ├── auth.js
     ├── chat.js
     ├── student-data.js
+    ├── semester.js
     └── database.js
 ```
 
@@ -34,6 +35,7 @@ frontend/
 | 7 | [chat.js](../frontend/js/chat.js) | 会话选择与新建、历史和待确认恢复、流式更新及限额反馈；重置时丢弃旧请求结果 |
 | 8 | [student-data.js](../frontend/js/student-data.js) | 个人数据面板、课程/成绩列表和增删操作；重置时取消请求并清空个人数据界面 |
 | 9 | [database.js](../frontend/js/database.js) | 独立数据浏览器入口；共用 API 与会话模块，提供表格、字段、关联及详情，账号变化时取消请求并清理数据 |
+| 10 | [semester.js](../frontend/js/semester.js) | 会话与个人数据共用的学期选择；处理中锁定，待确认恢复原学期，选择按账号与标签页保存 |
 
 功能模块通过小接口交给 `app.js` 协调，不相互导入。HTTP 和 SSE 只在 `api.js` 实现，存储键只在 `session.js` 管理；新增功能不应复制请求或 token 处理。动态消息和数据用文本节点渲染，不能把模型回复或课程字段当 HTML 插入。
 
@@ -76,3 +78,10 @@ playwright-cli -s=frontend-migration close
 聊天页右上角“数据浏览器”打开 `/database`，功能和验证见[数据库可视化说明](database-browser.md)。
 与聊天页面共用 token 和请求模块，独立 JavaScript 入口不创建 Agent。
 追加浏览器检查命令为 `playwright-cli -s=campus-database run-code --filename=scripts/test_database_browser.js`。
+
+## 学期选择
+
+会话栏新增学期选择，个人数据面板显示对应学期与版本；切换后取消旧请求并清空旧列表。
+测试应用另含一个明确标注的合成学期，仅用于验证切换，不会写入日常校园库。
+多学期浏览器命令为 `playwright-cli -s=campus-semesters run-code --filename=scripts/test_semesters_frontend.js`。
+数据范围、迁移和导入方式见[多学期说明](semesters.md)。

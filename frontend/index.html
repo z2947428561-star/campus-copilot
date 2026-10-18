@@ -32,6 +32,7 @@
       </div>
     </header>
     <nav class="conversation-bar" aria-label="会话管理">
+      <div class="semester-choice"><label for="semester-select">学期</label><select id="semester-select" aria-label="选择学期" disabled></select></div>
       <label for="conversation-select">会话</label>
       <select id="conversation-select" aria-label="选择会话"></select>
       <button type="button" class="link-button" id="new-conversation">新建会话</button>
@@ -68,6 +69,7 @@
 <section id="data-panel" aria-label="个人数据" aria-hidden="true">
   <div class="panel-head"><h2>我的课程与成绩</h2><button type="button" data-action="toggle-data" aria-label="关闭个人数据">关闭</button></div>
   <p>课程和成绩由你自行录入；排课为演示数据，并非学校系统记录。</p>
+  <p id="data-semester" role="status"></p>
   <h3>添加课程</h3>
   <div class="row"><input id="course-id" aria-label="课程代码" placeholder="课程代码，如 CS101"><button type="button" id="save-course">添加课程</button></div>
   <h3>录入成绩</h3>

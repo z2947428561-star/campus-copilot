@@ -21,6 +21,12 @@ def _dump(payload):
     return json.dumps(payload, ensure_ascii=False)
 
 
+def _period_overlaps(left, right):
+    start, end = left.split("-")
+    other_start, other_end = right.split("-")
+    return start < other_end and other_start < end
+
+
 def _scope(term):
     return {"semester_id": term["semester_id"], "semester": term["label"],
             "data_version": term["version"], "schedule_status": term["schedule_status"]}
@@ -51,7 +57,8 @@ def find_empty_classrooms(weekday: int, period: str, week_no: int = 1, semester_
                 return _dump({"ok": False, **_scope(term), "error": "目标教学周未录入，无法确认空闲教室"})
             rows = semesters.term_rows(conn, "timetable", term)
             all_rooms = conn.execute("SELECT room_id,type,capacity FROM classrooms ORDER BY capacity DESC,room_id").fetchall()
-        occupied = {r["room"] for r in rows if r["weekday"] == weekday and r["period"] == period and _week_covers(r["weeks"], week_no)}
+        occupied = {r["room"] for r in rows if r["weekday"] == weekday and _period_overlaps(r["period"], period)
+                    and _week_covers(r["weeks"], week_no)}
         free = [{"room": rid, "type": kind, "capacity": cap} for rid, kind, cap in all_rooms if rid not in occupied]
         return _dump({"ok": True, **_scope(term), "weekday": weekday, "weekday_cn": WEEKDAY_CN[weekday],
             "period": period, "week_no": week_no, "count": len(free), "rooms": free,

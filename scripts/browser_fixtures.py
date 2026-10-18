@@ -14,3 +14,12 @@ def create_catalog(path):
         seed_classrooms(cur, load_seed("seed_classrooms.json"))
         seed_timetable(cur, load_seed("seed_timetable.json"))
         seed_academic_cal(cur, load_seed("seed_academic_cal.json"))
+
+
+def add_test_semester(path):
+    """A clearly labelled synthetic term, present only in the browser-test app."""
+    from semesters import import_semester
+    import_semester({"semester_id": "2027-04", "label": "测试学期 2027-04", "academic_year": "2026/2027",
+        "start_date": "2027-04-01", "end_date": "2027-05-01", "source": "synthetic-browser-fixture",
+        "is_demo": True, "weeks": [{"week_no": 1, "start": "2027-04-05", "end": "2027-04-11"}],
+        "events": [], "timetable": None}, path)

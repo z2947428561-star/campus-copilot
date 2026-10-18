@@ -24,7 +24,7 @@ sequenceDiagram
 
 1. `frontend/index.html` 定义页面，`frontend/js/app.js` 绑定事件并协调登录、聊天和个人数据模块；`api.js` 统一发送同源请求与解析 SSE。
 2. `src/server.py` 校验 Bearer token，把服务端确认的身份放进 `UserContext`，校验所选会话的归属，再生成内部 thread_id。客户端只能选择自己的会话，不能自行指定聊天身份。
-3. `src/agent/assistant.py` 组装模型、11 个工具、提示词、中间件、Checkpointer 和 Store；Web 按进程延迟创建并复用 Agent。
+3. `src/agent/assistant.py` 组装模型、12 个工具、提示词、中间件、Checkpointer 和 Store；Web 按进程延迟创建并复用 Agent。
 4. `src/agent/streaming.py` 统一处理模型增量、工具结果和人工确认中断。Web 的工作线程把事件送入队列，HTTP 响应边接收边发送。
 5. 工具根据用途访问公共 SQLite、个人数据存储或向量库，再由模型生成回答。GPA 由 Python 代码计算，不交给模型心算。
 
@@ -60,7 +60,7 @@ SSE 事件类型包括 `token`、`interrupt`、`limit`、`done`、`error`。恢�
 | 3 | [`src/auth.py`](../src/auth.py) | 注册、PBKDF2 密码哈希、token 校验、退出和进程内限流 |
 | 4 | [`src/context.py`](../src/context.py) + [`src/agent/runtime.py`](../src/agent/runtime.py) | 用户身份、thread_id、递归限制和追踪配置的区别 |
 | 5 | [`src/agent/assistant.py`](../src/agent/assistant.py) | Agent 依赖的统一组装点，以及 CLI 各阶段的能力开关 |
-| 6 | [`src/tools/__init__.py`](../src/tools/__init__.py) | 11 个工具的清单和分组，再按下表读实现 |
+| 6 | [`src/tools/__init__.py`](../src/tools/__init__.py) | 12 个工具的清单和分组，再按下表读实现 |
 | 7 | [`src/agent/streaming.py`](../src/agent/streaming.py) | 流式输出与 HITL 中断/恢复为何能被 Web 和 CLI 共用 |
 | 8 | [`src/agent/middleware.py`](../src/agent/middleware.py) | PII 规则、摘要、GPA 路由、审计、调用限额、备用模型和确认 |
 | 9 | [`src/agent/memory.py`](../src/agent/memory.py) | Checkpointer 与 Store 的职责、后端切换、连接生命周期 |
@@ -89,6 +89,7 @@ SSE 事件类型包括 `token`、`interrupt`、`limit`、`done`、`error`。恢�
 | --- | --- |
 | `frontend/index.html`、`frontend/css/app.css`、`frontend/js/` | 页面结构、样式与原生浏览器模块；后端通过 `/assets/` 提供静态资源，模块职责见[前端说明](frontend.md) |
 | `src/conversations.py`、`src/agent/conversation_state.py`、`src/agent/web_runs.py` | 会话登记与归属、检查点展示投影、单进程执行互斥与有界事件队列 |
+| `src/semesters.py`、`scripts/import_semester.py`、`frontend/js/semester.js` | 学期登记、保留旧数据的迁移、版本导入与共用选择；见[多学期说明](semesters.md) |
 | `src/prompts/common.py`、`discipline.py`、`system.py`、`__init__.py` | 公共约束、政策引用与行为规则、系统提示词的组合入口 |
 | `src/messages.py` | 消息结构的公共构造方法 |
 | `src/prompt.py`、`src/bootstrap.py` | 早期 CLI 的提示词与启动辅助代码；先理解 Web 主链再回看 |
@@ -122,7 +123,7 @@ SSE 事件类型包括 `token`、`interrupt`、`limit`、`done`、`error`。恢�
 
 1. **配置和测试隔离**：模块导入时读取配置，容易让同一进程的测试共享状态。离线检查现在逐文件启动新进程，并在临时项目副本中运行。
 2. **多会话与并发**：Web 已支持新建、切换和刷新恢复，同会话执行互斥；Agent 和记忆连接按进程缓存。断连后后台请求继续到检查点并释放执行锁；当前不支持多实例或强制取消在途模型请求。
-3. **数据与时间范围**：学期和种子数据存在固定范围。多学期支持、政策版本和更新时间，比增加工具数量更直接影响可用性。
+3. **数据与时间范围**：已支持学期登记、按学期导入与查询，旧校历兼容读取，个人记录与确认操作携带学期。仓库仍只附带既有九月学期数据；政策版本时效与新校历仍需核实。
 4. **前端维护**：HTML、CSS 和 JavaScript 已分离，浏览器代码按 API、会话、鉴权、聊天和个人数据拆成模块，由 `app.js` 协调。无需引入独立前端服务；后续增加交互时同步扩展浏览器回归。
 5. **身份与运行边界**：用户名格式不代表学校身份认证；登录限流只在进程内生效。只监听本机回环地址，仍需保护 token、数据库和含个人内容的日志。
 6. **可复现性**：部分依赖只有最低版本约束；当前 Python 3.13 路径有检查，尚未提供完整跨平台依赖锁文件。

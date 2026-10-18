@@ -115,7 +115,7 @@ class DatabaseBrowserTest(unittest.TestCase):
         with _conn() as conn:
             for table in ("student_grades", "student_courses", "web_conversations"):
                 conn.execute(f'DELETE FROM "{table}"')
-            conn.executemany("INSERT INTO student_grades VALUES (?,?,?,?,?)", [
+            conn.executemany("INSERT INTO student_grades(user_id,semester,course_id,grade_point,letter) VALUES (?,?,?,?,?)", [
                 ("AAA2509001", "2026", "CS101", 3.7, "A-"), ("BBB2509002", "2026", "CS102", 4., "A")])
             conn.executemany("INSERT INTO student_courses VALUES (?,?,?)", [
                 ("AAA2509001", "2026", "CS101"), ("BBB2509002", "2026", "CS102")])

@@ -131,6 +131,7 @@ class ChatRequest(BaseModel):
     decisions: list[dict] | None = None # 完整决策列表(多动作 / edit 时用)
     conversation_id: str = Field(default="main", min_length=1, max_length=64)
     checkpoint_id: str | None = Field(default=None, max_length=128)
+    semester_id: str | None = Field(default=None, max_length=120)
 
     @model_validator(mode="after")
     def one_operation(self):
@@ -289,7 +290,8 @@ def conversation_detail(conversation_id: str, user_id: str = Depends(current_use
     agent = get_web_agent()
     cfg = conversation_config(user_id, conversation_id)
     state, running = _runs.snapshot(
-        cfg["configurable"]["thread_id"], lambda: conversation_state(agent, cfg))
+        cfg["configurable"]["thread_id"], lambda: {
+            **conversation_state(agent, cfg), "semester_id": conversations.semester_for(user_id, conversation_id)})
     return {**item, **state, "running": running}
 
 
@@ -383,6 +385,39 @@ def chat(req: ChatRequest, user_id: str = Depends(current_user)):
         agent = get_web_agent()
         state = conversation_state(agent, cfg)
         validate_operation(req, state)
+        incoming_semester = requested_term(req.semester_id)["semester_id"] if req.semester_id else None
+        saved_semester = conversations.semester_for(user_id, req.conversation_id)
+        if req.message is None:
+            if not saved_semester:
+                # Old checkpoints predate semester selection and used the legacy semester.
+                legacy = [t for t in semesters.list_semesters() if t["storage_key"] != t["semester_id"]]
+                if len(legacy) == 1:
+                    saved_semester = legacy[0]["semester_id"]
+                elif any(d.get("type") != "reject" for d in (req.decisions or [{"type": "approve" if req.resume else "reject"}])):
+                    raise HTTPException(status_code=409, detail="历史操作的学期无法确定，请取消后重新发起")
+            if saved_semester and incoming_semester and incoming_semester != saved_semester:
+                raise HTTPException(status_code=409, detail="待确认操作属于另一学期，请刷新恢复原学期后再确认")
+        chosen_id = saved_semester if req.message is None else incoming_semester
+        if chosen_id:
+            term = requested_term(chosen_id)
+        else:
+            try:
+                term = semesters.resolve_semester()
+            except ValueError:
+                term = None
+        run_semester_id = term["semester_id"] if term else None
+        if req.message is None:
+            for decision, action in zip(req.decisions or [], state["pending"]):
+                if decision.get("type") != "edit" or action["tool"] != "calculate_gpa":
+                    continue
+                before = action.get("args", {}).get("semester_id") or run_semester_id
+                after = decision["edited_action"]["args"].get("semester_id") or run_semester_id
+                before_id = requested_term(before)["semester_id"] if before else None
+                after_id = requested_term(after)["semester_id"] if after else None
+                if before_id != after_id:
+                    raise HTTPException(status_code=409, detail="不能通过编辑确认切换学期，请取消后按目标学期重新发起")
+        if req.message is not None and run_semester_id:
+            conversations.set_semester(user_id, req.conversation_id, run_semester_id)
         if req.message is not None and state["exhausted"]:
             raise HTTPException(status_code=429, detail="当前会话额度已用完，请新建会话；原记录仍保留")
         inputs = _build_inputs(req)
@@ -419,7 +454,7 @@ def chat(req: ChatRequest, user_id: str = Depends(current_user)):
                     "type": "limit", "kind": kind,
                     "message": "已达到调用上限，请简化问题重试；会话额度耗尽时请新建会话。",
                 }),
-                context=UserContext(user_id=user_id),
+                context=UserContext(user_id=user_id, semester_id=run_semester_id),
             )
             final_state = conversation_state(agent, cfg)
             if not saw_interrupt:

@@ -1,5 +1,6 @@
 import { requestJSON, streamChat } from './api.js';
 import { getUser } from './session.js';
+import { getSemesterId, lockSemester, selectSemester } from './semester.js';
 
 export function createChat() {
   const container = document.getElementById('chat');
@@ -26,6 +27,7 @@ export function createChat() {
   const selectionKey = () => 'cc_conversation:' + getUser();
 
   function controls() {
+    lockSemester(busy || loading || running || !ready || pending.length > 0);
     sendButton.disabled = busy || loading || running || exhausted || !ready || !conversationId || pending.length > 0;
     input.disabled = sendButton.disabled;
     selector.disabled = newButton.disabled = refreshButton.disabled = busy || loading;
@@ -102,6 +104,7 @@ export function createChat() {
       pending = state.pending;
       checkpointId = state.checkpoint_id;
       running = state.running;
+      if ((state.running || state.pending.length) && state.semester_id) selectSemester(state.semester_id);
       exhausted = state.exhausted;
       ready = true;
       renderPending();
@@ -146,7 +149,7 @@ export function createChat() {
     const text = message.firstChild;
     const cursor = message.lastChild;
     try {
-      await streamChat({ ...body, conversation_id: conversationId, checkpoint_id: checkpointId }, event => {
+      await streamChat({ ...body, conversation_id: conversationId, checkpoint_id: checkpointId, semester_id: getSemesterId() }, event => {
         if (controller !== current) return;
         if (event.type === 'token') text.textContent += event.text;
         else if (event.type === 'interrupt') {

@@ -50,7 +50,7 @@ class CourseGrade(BaseModel):
 class GpaReport(BaseModel):
     """GPA 分析报告(嵌套结构,第06章 §2.1.2 p12-14 建议嵌套不超过 3 层)。"""
 
-    total_credits: float = Field(gt=0, description="本学期总学分")
+    total_credits: float = Field(gt=0, description="所选学期总学分")
     weighted_gpa: float = Field(ge=0, le=4.0, description="学分加权平均绩点")
     strongest: CourseGrade = Field(description="绩点最高的课程")
     weakest: CourseGrade = Field(description="绩点最低的课程(主要拖累项)")

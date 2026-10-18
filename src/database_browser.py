@@ -15,6 +15,7 @@ import sqlite3
 import auth
 import config
 import student_data
+import semesters
 
 logger = logging.getLogger("campus")
 DOCS_DIR = Path(__file__).resolve().parents[1] / "data/raw_docs"
@@ -39,25 +40,30 @@ class Table:
 # (name, label, storage type). Auth tables and arbitrary SQL are intentionally absent.
 SPECS = {
     "campus": {
+        "semesters": Table("学期与版本", (("semester_id", "学期 ID", "TEXT"), ("label", "学期名称", "TEXT"),
+            ("academic_year", "学年", "TEXT"), ("start_date", "开始日期", "TEXT"), ("end_date", "结束日期", "TEXT"),
+            ("version", "资料版本", "INTEGER"), ("schedule_status", "排课覆盖", "TEXT"), ("is_demo", "演示配置", "BOOLEAN")),
+            "已录入的学期与校历、排课资料版本；旧结构以兼容视图呈现。", ("semester_id",)),
         "courses": Table("课程目录", (("course_id", "课程代码", "TEXT"), ("name", "课程名称", "TEXT"),
             ("credits", "学分", "REAL"), ("dept", "院系", "TEXT"), ("prerequisites", "先修课程", "TEXT"),
-            ("sem", "开课学期", "TEXT"), ("year", "年级", "INTEGER")), "公共课程目录，包含演示配置。", ("course_id",)),
+            ("sem", "建议开课月份", "TEXT"), ("year", "年级", "INTEGER")), "公共课程目录，包含演示配置；开课月份不代表具体学期已排课。", ("course_id",)),
         "classrooms": Table("教室", (("room_id", "教室编号", "TEXT"), ("building", "教学楼", "TEXT"),
             ("type", "教室类型", "TEXT"), ("capacity", "容量", "INTEGER"),
             ("has_projector", "投影设备", "INTEGER"), ("has_ac", "空调", "INTEGER")), "演示教室及设施。", ("room_id",)),
         "timetable": Table("排课", (("id", "编号", "INTEGER"), ("room", "教室", "TEXT"),
             ("weekday", "星期", "INTEGER"), ("period", "时段", "TEXT"), ("course_id", "课程代码", "TEXT"),
-            ("weeks", "教学周", "TEXT")), "演示排课，并非学校实时数据。", ("id",)),
+            ("weeks", "教学周", "TEXT"), ("semester_id", "学期 ID", "TEXT")), "已录入的学期排课，包含演示数据。", ("id",)),
         "calendar_weeks": Table("教学周", (("week_no", "周次", "INTEGER"), ("semester", "学期", "TEXT"),
             ("academic_year", "学年", "TEXT"), ("start", "开始日期", "TEXT"), ("end", "结束日期", "TEXT"),
-            ("type", "周类型", "TEXT")), "当前录入的校历范围。", ("week_no",)),
+            ("type", "周类型", "TEXT"), ("semester_id", "学期 ID", "TEXT")), "当前录入的校历范围。", ("semester_id", "week_no")),
         "semester_events": Table("学期事件", (("id", "编号", "INTEGER"), ("name", "事件名称", "TEXT"),
             ("event_type", "事件类型", "TEXT"), ("start_date", "开始日期", "TEXT"),
-            ("end_date", "结束日期", "TEXT")), "校历中的注册、假期与考试等事件。", ("id",)),
+            ("end_date", "结束日期", "TEXT"), ("semester_id", "学期 ID", "TEXT")), "校历中的注册、假期与考试等事件。", ("id",)),
     },
     "personal": {
         "student_grades": Table("我的成绩", (("semester", "学期", "TEXT"), ("course_id", "课程代码", "TEXT"),
-            ("grade_point", "绩点", "DOUBLE PRECISION"), ("letter", "等级", "TEXT")),
+            ("grade_point", "绩点", "DOUBLE PRECISION"), ("letter", "等级", "TEXT"),
+            ("credits_snapshot", "录入时学分", "DOUBLE PRECISION"), ("name_snapshot", "录入时课程名称", "TEXT")),
             "仅显示当前账号在各学期自行录入的成绩。", ("semester", "course_id")),
         "student_courses": Table("我的选课", (("semester", "学期", "TEXT"), ("course_id", "课程代码", "TEXT")),
             "仅显示当前账号在各学期的选课记录。", ("semester", "course_id")),
@@ -88,6 +94,9 @@ SOURCES = (
 )
 
 RELATIONS = [
+    {"from": "campus.timetable", "field": "semester_id", "to": "campus.semesters", "target": "semester_id", "kind": "学期关联"},
+    {"from": "campus.calendar_weeks", "field": "semester_id", "to": "campus.semesters", "target": "semester_id", "kind": "学期关联"},
+    {"from": "campus.semester_events", "field": "semester_id", "to": "campus.semesters", "target": "semester_id", "kind": "学期关联"},
     {"from": "campus.timetable", "field": "course_id", "to": "campus.courses", "target": "course_id", "kind": "外键"},
     {"from": "campus.timetable", "field": "room", "to": "campus.classrooms", "target": "room_id", "kind": "外键"},
     {"from": "personal.student_grades", "field": "course_id", "to": "campus.courses", "target": "course_id", "kind": "逻辑关联"},
@@ -130,10 +139,18 @@ def sql_page(source, name, spec, user_id, q, offset, size, sort, direction):
     ordering = [sort or spec.primary[0]] + [n for n in spec.primary if n != (sort or spec.primary[0])]
     order = ",".join(f'"{n}" {direction.upper()}' for n in ordering)
     with sql_connection(source) as conn:
-        count = conn.execute(f'SELECT COUNT(*) FROM "{name}"{where}', params).fetchone()[0]
+        table = f'"{name}"'
+        prefix = []
+        if source == "campus" and "semester_id" in names and not semesters.has_column(conn, name, "semester_id"):
+            terms = semesters.list_semesters()
+            if len(terms) > 1:
+                raise StoreUnavailable("旧结构无法确认每条记录的学期，请先迁移校历。")
+            table = f'(SELECT *, ? AS semester_id FROM "{name}")'
+            prefix = [terms[0]["semester_id"] if terms else ""]
+        count = conn.execute(f'SELECT COUNT(*) FROM {table}{where}', [*prefix, *params]).fetchone()[0]
         fields = ",".join(f'"{n}"' for n in names)
-        rows = conn.execute(f'SELECT {fields} FROM "{name}"{where} ORDER BY {order} LIMIT {ph} OFFSET {ph}',
-                            (*params, size, offset)).fetchall()
+        rows = conn.execute(f'SELECT {fields} FROM {table}{where} ORDER BY {order} LIMIT {ph} OFFSET {ph}',
+                            (*prefix, *params, size, offset)).fetchall()
     return [dict(zip(names, row)) for row in rows], count
 
 
@@ -163,7 +180,9 @@ def catalog(user_id):
         for name, spec in SPECS[source].items():
             total, state = None, "on_demand" if source == "index" else "ready"
             try:
-                if source in {"campus", "personal"}:
+                if source == "campus" and name == "semesters":
+                    total = len(semesters.list_semesters())
+                elif source in {"campus", "personal"}:
                     with sql_connection(source) as conn:
                         where = f" WHERE user_id={auth._ph()}" if source == "personal" else ""
                         total = conn.execute(f'SELECT COUNT(*) FROM "{name}"{where}',
@@ -238,12 +257,15 @@ def table_page(source, name, user_id, *, q="", page=1, page_size=25, sort="", di
     offset = (page - 1) * page_size
     info = {}
     try:
-        if source in {"campus", "personal"}:
+        if source in {"campus", "personal"} and name != "semesters":
             rows, total = sql_page(source, name, spec, user_id, q, offset, page_size, sort, direction)
             has_more = offset + len(rows) < total
-        elif source == "documents":
-            all_rows = [r for r in snapshot_rows() if not q or q.casefold() in " ".join(str(v) for v in r.values()).casefold()]
-            all_rows.sort(key=lambda r: (r[sort or "filename"].casefold(), r["filename"]), reverse=direction == "desc")
+        elif source == "documents" or (source == "campus" and name == "semesters"):
+            records = snapshot_rows() if source == "documents" else semesters.list_semesters()
+            all_rows = [r for r in records if not q or q.casefold() in " ".join(str(r.get(f[0], "")) for f in spec.fields).casefold()]
+            field = sort or spec.primary[0]
+            all_rows.sort(key=lambda r: (r.get(field) is None, r.get(field) if isinstance(r.get(field), (int, float))
+                                        else str(r.get(field, "")).casefold()), reverse=direction == "desc")
             total = len(all_rows)
             rows = all_rows[offset:offset + page_size]
             has_more = offset + len(rows) < total

@@ -19,6 +19,9 @@ CHECKS = (
     "test_chroma_rebuild.py",
     "test_policy_evidence.py",
     "test_database_browser.py",
+    "test_semesters.py",
+    "test_semester_data.py",
+    "test_semester_context.py",
     "test_course_recommendations.py",
 )
 

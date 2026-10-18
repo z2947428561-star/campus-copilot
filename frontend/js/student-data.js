@@ -1,4 +1,5 @@
 import { requestJSON } from './api.js';
+import { getSemesterId } from './semester.js';
 
 export function createStudentData() {
   const panel = document.getElementById('data-panel');
@@ -15,6 +16,7 @@ export function createStudentData() {
   const request = (path, method = 'GET', body) => requestJSON(path, {
     method, body, signal: controller.signal,
   });
+  const scoped = (path, semester = getSemesterId()) => path + (semester ? '?semester_id=' + encodeURIComponent(semester) : '');
 
   function showSection(title, rows, kind, label) {
     const heading = document.createElement('p');
@@ -35,7 +37,7 @@ export function createStudentData() {
       remove.type = 'button';
       remove.textContent = '删除';
       remove.addEventListener('click', () => mutate(
-        () => request('/api/me/' + kind + '/' + encodeURIComponent(row.course_id), 'DELETE'),
+        () => request(scoped('/api/me/' + kind + '/' + encodeURIComponent(row.course_id), row.semester_id), 'DELETE'),
         '已删除 ' + row.course_id));
       line.append(value, remove);
       list.appendChild(line);
@@ -43,10 +45,14 @@ export function createStudentData() {
   }
 
   async function refresh() {
+    controller.abort();
+    controller = new AbortController();
     const current = controller;
+    const semester = getSemesterId();
+    list.replaceChildren();
     try {
       const [courses, grades] = await Promise.all([
-        request('/api/me/courses'), request('/api/me/grades'),
+        request(scoped('/api/me/courses', semester)), request(scoped('/api/me/grades', semester)),
       ]);
       if (controller !== current) return;
       list.replaceChildren();
@@ -80,6 +86,7 @@ export function createStudentData() {
   function saveCourse() {
     return mutate(() => request('/api/me/courses', 'PUT', {
       course_id: document.getElementById('course-id').value.trim(),
+      semester_id: getSemesterId(),
     }), '课程已保存');
   }
 
@@ -91,9 +98,18 @@ export function createStudentData() {
       return request('/api/me/grades', 'PUT', {
         course_id: document.getElementById('grade-course').value.trim(),
         grade_point: Number(point), letter,
+        semester_id: getSemesterId(),
       });
     }, '成绩已保存');
   }
+
+  window.addEventListener('semesterchange', () => {
+    controller.abort();
+    controller = new AbortController();
+    list.replaceChildren();
+    setStatus();
+    if (panel.classList.contains('open')) refresh();
+  });
 
   function reset() {
     controller.abort();

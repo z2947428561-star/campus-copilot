@@ -3,6 +3,7 @@ import argparse
 import json
 from pathlib import Path
 import sys
+import sqlite3
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
@@ -26,7 +27,7 @@ def main():
                                      expected_version=args.expected_version)
         print(json.dumps(result, ensure_ascii=False))
         return 0
-    except (ValueError, OSError) as exc:
+    except (ValueError, OSError, sqlite3.Error) as exc:
         print("学期导入失败：" + str(exc), file=sys.stderr)
         return 1
 

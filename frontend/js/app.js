@@ -3,11 +3,12 @@ import { createAuth } from './auth.js';
 import { createChat } from './chat.js';
 import { createStudentData } from './student-data.js';
 import { clearSession, getToken } from './session.js';
+import { loadSemesters, resetSemesters } from './semester.js';
 
 const chat = createChat();
 const studentData = createStudentData();
 const auth = createAuth({
-  onLogin: () => { auth.showChat(); chat.open(); chat.focus(); },
+  onLogin: () => openSession(),
   onLogout: () => showLogin(),
 });
 
@@ -15,7 +16,20 @@ function showLogin(message = '') {
   clearSession();
   chat.reset();
   studentData.reset();
+  resetSemesters();
   auth.showLogin(message);
+}
+
+async function openSession() {
+  auth.showChat();
+  try {
+    await loadSemesters();
+    if (!getToken()) return;
+    await chat.open();
+    chat.focus();
+  } catch (error) {
+    if (error.name !== 'AbortError' && getToken()) document.getElementById('conversation-status').textContent = error.message;
+  }
 }
 
 setUnauthorizedHandler(showLogin);
@@ -24,7 +38,8 @@ window.addEventListener('storage', event => {
   if (event.key !== 'cc_token' && event.key !== 'cc_user' && event.key !== null) return;
   chat.reset();
   studentData.reset();
-  if (getToken()) { auth.showChat(); chat.open(); }
+  resetSemesters();
+  if (getToken()) { openSession(); }
   else auth.showLogin('登录状态已在其他页面改变，请重新登录');
 });
 const bind = (id, callback) => document.getElementById(id).addEventListener('click', callback);
@@ -52,5 +67,5 @@ document.addEventListener('keydown', event => {
   if (event.key === 'Escape' && studentData.isOpen()) studentData.toggle();
 });
 
-if (getToken()) { auth.showChat(); chat.open(); chat.focus(); }
+if (getToken()) { openSession(); }
 else showLogin();

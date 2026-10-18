@@ -43,6 +43,11 @@ def set_grade(user_id: str, course_id: str, grade_point: float, letter: str,
         raise ValueError("绩点需在 0–4 之间，等级不能为空")
     ph = _ph()
     with _conn() as conn:
+        old = conn.execute(
+            f"SELECT credits_snapshot,name_snapshot FROM student_grades WHERE user_id={ph} AND semester={ph} AND course_id={ph}",
+            (user_id, term["storage_key"], course["course_id"])).fetchone()
+        credits = old[0] if old and old[0] is not None else course["credits"]
+        name = old[1] if old and old[1] is not None else course["name"]
         conn.execute(
             f"DELETE FROM student_grades WHERE user_id={ph} AND semester={ph} AND course_id={ph}",
             (user_id, term["storage_key"], course["course_id"]),
@@ -50,10 +55,10 @@ def set_grade(user_id: str, course_id: str, grade_point: float, letter: str,
         conn.execute(
             f"INSERT INTO student_grades (user_id,semester,course_id,grade_point,letter,credits_snapshot,name_snapshot) "
             f"VALUES ({ph},{ph},{ph},{ph},{ph},{ph},{ph})",
-            (user_id, term["storage_key"], course["course_id"], grade_point, letter.strip().upper(), course["credits"], course["name"]),
+            (user_id, term["storage_key"], course["course_id"], grade_point, letter.strip().upper(), credits, name),
         )
         conn.commit()
-    return {**course, "grade_point": grade_point, "letter": letter.strip().upper(),
+    return {**course, "credits": credits, "name": name, "grade_point": grade_point, "letter": letter.strip().upper(),
             "semester": term["label"], "semester_id": term["semester_id"]}
 
 

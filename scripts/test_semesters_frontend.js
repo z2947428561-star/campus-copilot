@@ -73,6 +73,8 @@ async page => {
   await page.setViewportSize({ width: 390, height: 844 });
   ensure(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'Semester selector causes mobile overflow');
   ensure(await page.locator('#semester-select').isVisible(), 'Mobile semester selector missing');
+  ensure((await page.locator('#semester-select').boundingBox()).width > 180, 'Mobile semester selection unreadable');
+  ensure((await page.locator('#conversation-select').boundingBox()).width > 80, 'Mobile conversation selection collapsed');
   ensure(errors.length === 0, errors.join('\n'));
   return { passed: true, checks: ['cross-semester grades', 'late-response isolation', 'HITL semester lock',
     'HITL refresh restoration', 'selection persistence', 'mobile layout'], errors };

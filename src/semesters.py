@@ -4,7 +4,6 @@ from datetime import date, datetime, timedelta, timezone
 import hashlib
 import json
 from pathlib import Path
-import re
 import sqlite3
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -59,7 +58,7 @@ class Event(BaseModel):
 
 class Session(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    course_id: str = Field(min_length=1, max_length=64)
+    course_id: str | None = Field(default=None, min_length=1, max_length=64)
     room: str = Field(min_length=1, max_length=64)
     weekday: int = Field(ge=1, le=5)
     period: str = Field(pattern=r"^\d{2}:\d{2}-\d{2}:\d{2}$")
@@ -153,7 +152,8 @@ def list_semesters(path=None):
         return []
     with catalog_connection(target) as conn:
         if _exists(conn, "semesters"):
-            return [{**dict(row), "legacy": False} for row in conn.execute("SELECT * FROM semesters ORDER BY start_date,semester_id")]
+            return [{**dict(row), "is_demo": bool(row["is_demo"]), "legacy": False}
+                    for row in conn.execute("SELECT * FROM semesters ORDER BY start_date,semester_id")]
         payload = _legacy_payload(conn)
         return [_record(payload, storage_key=payload.label, legacy=True)] if payload else []
 
@@ -251,7 +251,7 @@ def import_semester(data, path=None, *, expected_version=None):
         if old and expected_version != old["version"]:
             raise ValueError("学期数据已存在或版本变化；请核对后提供 expected_version")
         for session in payload.timetable or []:
-            if not conn.execute("SELECT 1 FROM courses WHERE course_id=?", (session.course_id,)).fetchone():
+            if session.course_id is not None and not conn.execute("SELECT 1 FROM courses WHERE course_id=?", (session.course_id,)).fetchone():
                 raise ValueError("排课引用不存在的课程：" + session.course_id)
             if not conn.execute("SELECT 1 FROM classrooms WHERE room_id=?", (session.room,)).fetchone():
                 raise ValueError("排课引用不存在的教室：" + session.room)
