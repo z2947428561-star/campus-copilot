@@ -111,6 +111,10 @@ class SemesterDataTest(SemesterFixture, unittest.TestCase):
         self.assertEqual(result["semester_id"], "2026-09")
         result = json.loads(calculate_gpa.func(runtime=runtime, semester_id="2027-04"))
         self.assertEqual(result["weighted_gpa"], 1.)
+        self.save_grade("2026-09", 3.5, "CS101")
+        updated = json.loads(calculate_gpa.func(runtime=runtime))
+        self.assertEqual(updated["weighted_gpa"], 3.67)
+        self.assertEqual(updated["total_credits"], 6.)
 
     def test_legacy_grades_keep_data_and_explain_credit_fallback(self):
         from auth import _conn
@@ -150,6 +154,15 @@ class SemesterDataTest(SemesterFixture, unittest.TestCase):
         self.assertEqual(len(schedule["sessions"]), 1)
         result = json.loads(find_empty_classrooms.func(1, "08:30-10:00", 3, runtime=runtime))
         self.assertFalse(result["ok"])
+
+    def test_imported_partial_time_overlap_is_occupied(self):
+        from tools.timetable import find_empty_classrooms
+        term = second_term()
+        term["timetable"][0]["period"] = "09:00-09:45"
+        self.semesters.import_semester(term, self.path, expected_version=1)
+        result = json.loads(find_empty_classrooms.func(1, "08:30-10:00", 1, semester_id="2027-04"))
+        self.assertTrue(result["ok"])
+        self.assertNotIn("A101", [r["room"] for r in result["rooms"]])
 
 
 if __name__ == "__main__":
