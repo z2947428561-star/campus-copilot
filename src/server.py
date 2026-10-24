@@ -52,7 +52,7 @@ from uuid import uuid4
 # agent/ tools/ 等兄弟包会找不到 —— 先把本文件所在目录塞进去
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Query
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from langgraph.types import Command
@@ -60,6 +60,7 @@ from langgraph.errors import GraphRecursionError
 from pydantic import BaseModel, Field, model_validator
 
 import auth
+import dorm_auth
 from agent.assistant import get_agent
 from agent.conversation_state import conversation_state
 from agent.memory import close_memory
@@ -107,13 +108,14 @@ async def security_headers(request, call_next):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"
-    if request.url.path in {"/", "/database"} or request.url.path.startswith(("/api/", "/assets/")):
+    if request.url.path in {"/", "/database"} or request.url.path.startswith(("/api/", "/internal/", "/assets/")):
         response.headers["Cache-Control"] = "no-store"
     return response
 
 # Agent 单例:模型连接、向量库句柄都贵,进程内共享;
 # 会话隔离靠 checkpointer 的 thread_id,不靠多实例
 _agent = None
+_dorm_agent = None
 _agent_lock = threading.Lock()
 _runs = RunRegistry()
 
@@ -124,6 +126,22 @@ def get_web_agent():
         if _agent is None:
             _agent = get_agent(with_middleware=True, with_memory=True)
     return _agent
+
+
+def agent_for_user(user_id):
+    global _dorm_agent
+    if not user_id.startswith("xmumdorm:"):
+        return get_web_agent()
+    with _agent_lock:
+        if _dorm_agent is None:
+            from prompts.system import build_dorm_system_prompt
+            from tools.policy import search_policy
+            from tools.guides import search_guides
+            from tools.dorm_personal import get_my_schedule, get_my_todos, get_my_campus_clock, get_campus_holidays
+
+            _dorm_agent = get_agent(with_middleware=True, with_memory=True,
+                                    tools=[search_policy, search_guides, get_my_schedule, get_my_todos, get_my_campus_clock, get_campus_holidays], system_prompt=build_dorm_system_prompt())
+    return _dorm_agent
 
 
 class ChatRequest(BaseModel):
@@ -169,6 +187,15 @@ def current_user(authorization: str = Header(default="")) -> str:
     if username is None:
         raise HTTPException(status_code=401, detail="未登录或登录已过期")
     return username
+
+
+def dorm_user(x_campus_assertion: str = Header(default="")) -> str:
+    try:
+        return dorm_auth.verify_assertion(x_campus_assertion)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail="校园助手接入尚未配置") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail="内部身份验证失败") from exc
 
 
 @app.post("/api/register")
@@ -300,7 +327,7 @@ def archived_conversation_state(agent, cfg, user_id):
 @app.get("/api/conversations/{conversation_id}")
 def conversation_detail(conversation_id: str, user_id: str = Depends(current_user)):
     item = owned_conversation(user_id, conversation_id)
-    agent = get_web_agent()
+    agent = agent_for_user(user_id)
     cfg = conversation_config(user_id, conversation_id)
     state, running = _runs.snapshot(
         cfg["configurable"]["thread_id"], lambda: {
@@ -397,7 +424,9 @@ def chat(req: ChatRequest, user_id: str = Depends(current_user)):
     if not _runs.claim(thread_id):
         raise HTTPException(status_code=409, detail="该会话正在处理请求，请稍后刷新，或新建会话")
     try:
-        agent = get_web_agent()
+        # A delete may have completed after the initial ownership lookup.
+        owned_conversation(user_id, req.conversation_id)
+        agent = agent_for_user(user_id)
         state = archived_conversation_state(agent, cfg, user_id)
         validate_operation(req, state)
         incoming_semester = requested_term(req.semester_id)["semester_id"] if req.semester_id else None
@@ -451,6 +480,9 @@ def chat(req: ChatRequest, user_id: str = Depends(current_user)):
         streamed = []
 
         def on_token(text):
+            if user_id.startswith('xmumdorm:'):
+                from dorm_answer import format_answer
+                text = format_answer(text, req.message)
             streamed.append(text)
             delivery.publish({"type": "token", "text": text})
 
@@ -472,7 +504,9 @@ def chat(req: ChatRequest, user_id: str = Depends(current_user)):
             stream_turn(
                 agent, inputs, cfg, on_decide=on_decide,
                 on_token=on_token,
-                on_messages=lambda messages: chat_history.capture(user_id, thread_id, messages, run_semester_id),
+                final_answers_only=user_id.startswith('xmumdorm:'),
+                on_messages=lambda messages: chat_history.capture(user_id, thread_id, messages, run_semester_id,
+                    **({'question': req.message} if user_id.startswith('xmumdorm:') else {})),
                 on_limit=lambda kind: delivery.publish({
                     "type": "limit", "kind": kind,
                     "message": "已达到调用上限，请简化问题重试；会话额度耗尽时请新建会话。",
@@ -518,3 +552,57 @@ def chat(req: ChatRequest, user_id: str = Depends(current_user)):
         event_stream(), media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+# Service-only allowlist: assertions grant no access to local auth/data APIs.
+dorm_router = APIRouter(prefix="/internal/xmumdorm")
+
+
+@dorm_router.get("/conversations")
+def dorm_conversations(user_id: str = Depends(dorm_user)):
+    return conversation_list(user_id)
+
+
+@dorm_router.post("/conversations")
+def dorm_create_conversation(user_id: str = Depends(dorm_user)):
+    return conversation_create(user_id)
+
+
+@dorm_router.get("/conversations/{conversation_id}")
+def dorm_conversation(conversation_id: str, user_id: str = Depends(dorm_user)):
+    return conversation_detail(conversation_id, user_id)
+
+
+def change_dorm_conversation_visibility(user_id, conversation_id, *, restore=False):
+    try:
+        conversations.get_conversation(user_id, conversation_id, include_deleted=True)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail="会话不存在") from error
+    thread_id = conversations.thread_id_for(user_id, conversation_id)
+    if not _runs.claim(thread_id):
+        raise HTTPException(status_code=409, detail="该会话正在回答，请完成后再删除或撤销")
+    try:
+        if restore:
+            return conversations.restore_conversation(user_id, conversation_id)
+        conversations.delete_conversation(user_id, conversation_id)
+        return {"id": conversation_id, "deleted": True}
+    finally:
+        _runs.release(thread_id)
+
+
+@dorm_router.delete("/conversations/{conversation_id}")
+def dorm_delete_conversation(conversation_id: str, user_id: str = Depends(dorm_user)):
+    return change_dorm_conversation_visibility(user_id, conversation_id)
+
+
+@dorm_router.post("/conversations/{conversation_id}/restore")
+def dorm_restore_conversation(conversation_id: str, user_id: str = Depends(dorm_user)):
+    return change_dorm_conversation_visibility(user_id, conversation_id, restore=True)
+
+
+@dorm_router.post("/chat")
+def dorm_chat(req: ChatRequest, user_id: str = Depends(dorm_user)):
+    return chat(req, user_id)
+
+
+app.include_router(dorm_router)

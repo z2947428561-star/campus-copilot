@@ -15,6 +15,9 @@ def init_conversations():
         conn.execute("""CREATE TABLE IF NOT EXISTS web_conversation_semesters (
             user_id TEXT NOT NULL, conversation_id TEXT NOT NULL, semester_id TEXT NOT NULL,
             PRIMARY KEY (user_id, conversation_id))""")
+        conn.execute("""CREATE TABLE IF NOT EXISTS web_conversation_deletions (
+            user_id TEXT NOT NULL, conversation_id TEXT NOT NULL, deleted_at DOUBLE PRECISION NOT NULL,
+            PRIMARY KEY (user_id, conversation_id))""")
         conn.commit()
 
 
@@ -51,8 +54,10 @@ def list_conversations(user_id):
     _ensure_legacy(user_id)
     with _conn() as conn:
         rows = conn.execute(
-            f"SELECT conversation_id,title,created_at FROM web_conversations "
-            f"WHERE user_id={_ph()} ORDER BY created_at DESC, conversation_id",
+            f"SELECT c.conversation_id,c.title,c.created_at FROM web_conversations c "
+            f"WHERE c.user_id={_ph()} AND NOT EXISTS (SELECT 1 FROM web_conversation_deletions d "
+            "WHERE d.user_id=c.user_id AND d.conversation_id=c.conversation_id) "
+            "ORDER BY c.created_at DESC, c.conversation_id",
             (user_id,),
         ).fetchall()
     return [dict(zip(("id", "title", "created_at"), row)) for row in rows]
@@ -71,19 +76,43 @@ def create_conversation(user_id):
     return item
 
 
-def get_conversation(user_id, conversation_id):
+def get_conversation(user_id, conversation_id, *, include_deleted=False):
     if conversation_id == "main":
         _ensure_legacy(user_id)
     ph = _ph()
     with _conn() as conn:
+        visible = "" if include_deleted else (
+            " AND NOT EXISTS (SELECT 1 FROM web_conversation_deletions d "
+            "WHERE d.user_id=c.user_id AND d.conversation_id=c.conversation_id)")
         row = conn.execute(
-            f"SELECT conversation_id,title,created_at FROM web_conversations "
-            f"WHERE user_id={ph} AND conversation_id={ph}",
+            f"SELECT c.conversation_id,c.title,c.created_at FROM web_conversations c "
+            f"WHERE c.user_id={ph} AND c.conversation_id={ph}" + visible,
             (user_id, conversation_id),
         ).fetchone()
     if row is None:
         raise KeyError(conversation_id)
     return dict(zip(("id", "title", "created_at"), row))
+
+
+def delete_conversation(user_id, conversation_id):
+    """Hide persistently without erasing messages, so the UI can undo deletion."""
+    get_conversation(user_id, conversation_id, include_deleted=True)
+    ph = _ph()
+    with _conn() as conn:
+        conn.execute(
+            f"INSERT INTO web_conversation_deletions (user_id,conversation_id,deleted_at) VALUES ({ph},{ph},{ph}) "
+            "ON CONFLICT(user_id,conversation_id) DO NOTHING", (user_id, conversation_id, time.time()))
+        conn.commit()
+
+
+def restore_conversation(user_id, conversation_id):
+    item = get_conversation(user_id, conversation_id, include_deleted=True)
+    ph = _ph()
+    with _conn() as conn:
+        conn.execute(f"DELETE FROM web_conversation_deletions WHERE user_id={ph} AND conversation_id={ph}",
+                     (user_id, conversation_id))
+        conn.commit()
+    return item
 
 
 def thread_id_for(user_id, conversation_id):

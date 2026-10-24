@@ -30,12 +30,19 @@ def _visible(message):
     return getattr(message, 'additional_kwargs', {}).get('lc_source') != 'summarization'
 
 
-def _rows(messages, semester_id):
+def _rows(messages, semester_id, *, hide_tool_narration=False, question=None):
     rows = []
     for index, message in enumerate(messages):
         if not _visible(message):
             continue
+        if hide_tool_narration and getattr(message, 'type', None) == 'ai' and getattr(message, 'tool_calls', None):
+            continue
         text = extract_text(message)
+        if message.type == 'human':
+            question = text
+        if hide_tool_narration and message.type == 'ai':
+            from dorm_answer import format_answer
+            text = format_answer(text, question)
         if not text:
             continue
         role = 'user' if message.type == 'human' else 'assistant'
@@ -57,8 +64,8 @@ def _insert(conn, user_id, thread_id, rows):
                 [(user_id, thread_id, *row) for row in rows])
 
 
-def capture(user_id, thread_id, messages, semester_id=None):
-    rows = _rows(messages, semester_id)
+def capture(user_id, thread_id, messages, semester_id=None, *, question=None):
+    rows = _rows(messages, semester_id, hide_tool_narration=user_id.startswith('xmumdorm:'), question=question)
     if rows:
         with personal_connection() as conn:
             _insert(conn, user_id, thread_id, rows)
@@ -77,7 +84,7 @@ def import_checkpoints(user_id, thread_id, agent, cfg, snapshot):
         snapshots = [snapshot]
     rows, seen = [], set()
     for state in reversed(snapshots):
-        for row in _rows((state.values or {}).get('messages', []), None):
+        for row in _rows((state.values or {}).get('messages', []), None, hide_tool_narration=user_id.startswith('xmumdorm:')):
             if row[0] not in seen:
                 seen.add(row[0])
                 rows.append(row)

@@ -47,6 +47,11 @@ def _env_int(key: str, default: int) -> int:
         return default
 
 
+# Optional service-to-service bridge. Empty means disabled; never reuse login keys.
+XMUMDORM_SHARED_SECRET = _env("CAMPUS_AGENT_SHARED_SECRET")
+XMUMDORM_API_URL = _env("XMUMDORM_API_URL")
+
+
 # ---------------------------------------------------------------- 主对话模型
 # 课程 ch02 §3.1(p12-13) 推荐用 "provider:model" 冒号前缀或显式 model_provider。
 # 注意:model_provider="deepseek" 需要额外安装 langchain-deepseek;
@@ -164,6 +169,7 @@ KB_REGISTRY_PATH = _env("KB_REGISTRY_PATH", "data/kb_releases.db")
 KB_TOP_K = _env_int("KB_TOP_K", 5)
 # Both backends use (cosine + 1) / 2 for policy evidence. Initial, uncalibrated cutoff.
 KB_MIN_RELEVANCE = float(_env("KB_MIN_RELEVANCE", "0.70"))
+DORM_GUIDE_DB_PATH = _env("DORM_GUIDE_DB_PATH", "")
 if not 0 <= KB_MIN_RELEVANCE <= 1:
     raise ValueError("KB_MIN_RELEVANCE must be between 0 and 1")
 

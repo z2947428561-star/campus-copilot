@@ -1,0 +1,23 @@
+# 体积与安全:这些不进构建上下文
+.git/
+.venv/
+.playwright-cli/
+.tmp_course/
+.workbuddy/
+.github/
+backups/
+tmp/
+output/
+examples/
+docs/
+
+# 本地数据(镜像内由种子重建 / kb_data 单独提供)
+data/local/
+data/chroma_db/
+data/memory.db*
+data/campus.db*
+
+# 密钥永不进镜像
+.env
+.env.*
+!.env.example

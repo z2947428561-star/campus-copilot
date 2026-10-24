@@ -51,6 +51,7 @@ def get_agent(
     tools: list | None = None,
     response_format=None,
     local_ollama: bool = False,
+    system_prompt: str | None = None,
 ):
     """创建并返回组装好的 Agent 实例。
 
@@ -89,7 +90,7 @@ def get_agent(
         store = None
 
     # 第04章 §1.2(p2) 的"工作说明书":按阶段组装,不再用一份写死的大常量
-    system_prompt = build_system_prompt(
+    system_prompt = system_prompt or build_system_prompt(
         with_memory=store is not None,
         # 知识库是否可用由检索层自己决定并诚实回报;这里默认注入引用纪律,
         # 若知识库未接入,search_policy 会返回"未接入"提示,

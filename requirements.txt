@@ -10,6 +10,7 @@
 langchain==1.2.12
 langchain-openai==1.6.0          # DeepSeek 走 OpenAI 兼容网关(第02章 §2.2 p8)
 python-dotenv==1.2.3
+requests>=2.32,<3               # 公开 Wiki 采集：显式认证代理，失败即停止
 # 可选:装了它才能在 init_chat_model 里用 model_provider="deepseek"
 #      (第02章 §2.1.1 p4 的 ChatDeepSeek)。不装则走 openai 兼容写法,功能等价。
 # langchain-deepseek

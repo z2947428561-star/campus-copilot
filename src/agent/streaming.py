@@ -121,6 +121,7 @@ def stream_turn(
     max_interrupt_rounds: int = 3,
     on_limit: Callable[[str], None] | None = None,
     on_messages: Callable[[list], None] | None = None,
+    final_answers_only: bool = False,
 ) -> str:
     """跑完一轮对话,直到没有待处理中断。
 
@@ -134,6 +135,7 @@ def stream_turn(
         max_interrupt_rounds: 防止中断-恢复无限循环
         on_limit: 模型或工具达到限额时的回调；未提供时以可读文本反馈
         on_messages: 保存完整消息更新；在后续摘要裁剪前调用，不改变模型上下文
+        final_answers_only: 仅发送完成的、不携带工具调用的模型消息；工具过程说明不对外显示
 
     返回:本轮模型输出的完整文本。
 
@@ -143,6 +145,7 @@ def stream_turn(
     full_reply = ""
     current_inputs = inputs
     reported_limits = set()
+    emitted_messages = set()
 
     for _ in range(max_interrupt_rounds):
         pending = None
@@ -151,11 +154,25 @@ def stream_turn(
         if context is not None:
             stream_kwargs["context"] = context
         for mode, data in agent.stream(current_inputs, cfg, **stream_kwargs):
+            if mode == "updates" and final_answers_only:
+                update = data.get(MODEL_NODE)
+                for message in update.get('messages', []) if isinstance(update, dict) else []:
+                    if getattr(message, 'type', None) != 'ai' or getattr(message, 'tool_calls', None):
+                        continue
+                    identifier = getattr(message, 'id', None) or id(message)
+                    if identifier in emitted_messages:
+                        continue
+                    emitted_messages.add(identifier)
+                    text = extract_text(message)
+                    if text:
+                        full_reply += text
+                        if on_token:
+                            on_token(text)
             if mode == "updates" and on_messages:
                 for update in data.values():
                     if isinstance(update, dict) and isinstance(update.get("messages"), list):
                         on_messages(update["messages"])
-            if mode == "messages":
+            if mode == "messages" and not final_answers_only:
                 chunk, metadata = data
                 text = model_text(chunk, metadata)
                 if text:

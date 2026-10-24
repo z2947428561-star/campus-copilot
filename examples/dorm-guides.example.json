@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "complete": true,
+  "fixture": true,
+  "origin": "https://example.invalid",
+  "articles": [
+    {
+      "id": 1,
+      "status": "published",
+      "title": "示例：测试接待流程",
+      "category": "campus-guide",
+      "contentType": "markdown",
+      "summary": "仅用于验证导入格式，不是学校真实指南。",
+      "content": "# 测试接待\n这是虚构示例。到测试接待点登记，再领取蓝色测试卡。"
+    }
+  ]
+}

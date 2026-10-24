@@ -42,3 +42,12 @@ backups/
 
 # Local browser inspection artifacts
 .playwright-cli/
+
+# Local working artifacts
+tmp/
+output/
+
+# Deployment knowledge base snapshot: built locally, shipped inside the image
+# (re-includes after the *.db / *.sqlite3 rules above)
+!kb_data/
+!kb_data/**

@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--summarize', action='store_true', help='使用真实摘要中间件和虚构摘要模型验证历史保留')
+    parser.add_argument('--port', type=int, default=18765)
     args = parser.parse_args()
     sys.path.insert(0, str(ROOT))
     os.environ.update({
@@ -39,8 +40,9 @@ def main() -> None:
         from fake_chat_agent import build_agent
 
         server._agent = build_agent(summarize=args.summarize)
-        print("Browser-test app: http://127.0.0.1:18765/ (temporary accounts; offline fake model)", flush=True)
-        uvicorn.run(server.app, host="127.0.0.1", port=18765, log_level="warning", access_log=False)
+        server._dorm_agent = server._agent
+        print(f"Browser-test app: http://127.0.0.1:{args.port}/ (temporary accounts; offline fake model)", flush=True)
+        uvicorn.run(server.app, host="127.0.0.1", port=args.port, log_level="warning", access_log=False)
 
 
 if __name__ == "__main__":

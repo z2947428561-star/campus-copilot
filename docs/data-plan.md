@@ -111,6 +111,10 @@ grades(可选)   成绩:course_id, score, grade_point —— 用虚构数据演�
 另有可选的本机学生共编选课经验数据，独立保存，不作为官方政策或课程目录。
 原始 Excel 与 `*.local.json` 不公开提交，导入与查询工具见[选课经验说明](course-recommendations.md)。
 
+SurviveXMUM 学生 Wiki 另有[代理专用采集脚本](survivexmum.md)，可获取公开 Markdown 与版本、
+来源和抓取时间。快照保存在忽略的 `data/local/survivexmum/`，尚未接入现有政策索引；
+学生经验不能作为学校官方规定。采集只走显式配置的代理，失败即停止。
+
 - 文档更新:按学期核对公开来源快照,当前 `scripts/build_kb.py` 写入独立版本、验收后切换，支持暂存和回滚；见[存储说明](storage.md)。
   尚未实现按 `source` 增量更新
 - 本机验证时整理脱敏后的失败用例，补充自建评估集；不将真实账号、成绩、问答或数据库提交到仓库。

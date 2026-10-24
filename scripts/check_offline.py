@@ -15,6 +15,9 @@ CHECKS = (
     "test_reset_local_password.py",
     "test_student_data.py",
     "test_server_security.py",
+    "test_dorm_integration.py",
+    "test_dorm_guides.py",
+    "test_dorm_personal.py",
     "test_conversations.py",
     "test_run_registry.py",
     "test_chat_history.py",
@@ -28,6 +31,7 @@ CHECKS = (
     "test_storage.py",
     "test_profile.py",
     "test_course_recommendations.py",
+    "test_survivexmum_crawler.py",
 )
 
 
